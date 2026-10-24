@@ -34,3 +34,7 @@ __pycache__/
 app/src/main/assets/directaudio/
 app/src/main/assets/hybris/
 /tools/vr/out/
+
+# Content-addressed local build input; publish with corresponding sources separately.
+/app/src/main/assets/mavk/runtime.zip
+/app/src/main/assets/dexopt/

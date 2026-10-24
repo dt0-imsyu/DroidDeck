@@ -1,0 +1,6 @@
+<resources>
+    <string name="mavk_backend">Mavk / Mali — экспериментальный</string>
+    <string name="mavk_backend_hint">Sarek D3D11 64-bit и Vulkan Mali. Для следующего запуска. Совместимость с играми пока не проверена.</string>
+    <string name="mavk_steam_ui">Аппаратный интерфейс Steam</string>
+    <string name="mavk_steam_ui_hint">Экспериментальное ускорение Zink → Mali. Возможны небольшие помехи меню. Выключите для программного рендеринга. Для следующего запуска.</string>
+</resources>

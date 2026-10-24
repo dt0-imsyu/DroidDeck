@@ -1,3 +1,5 @@
+Experimental Mavk fork: [architecture, measured results and limitations](README.MAVK.md).
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="artwork/droiddeck-banner-dark.svg">

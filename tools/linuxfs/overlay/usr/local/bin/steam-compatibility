@@ -318,7 +318,7 @@ if [ -n "$depot" ]; then
   BL_STORE_PROTON="$depot/proton"; export BL_STORE_PROTON
   bl_store_launch "$@"
   BL_STORE_ARGS=("$@")
-  bl_run ${BL_TASKSET:-} /usr/local/bin/droiddeck-game-env "$depot/proton" "$verb" "$@" "${BL_EXTRA_ARGS[@]}"
+  bl_run ${BL_TASKSET:-} "${DROIDDECK_GAME_ENV_LAUNCHER:-/usr/local/bin/droiddeck-game-env}" "$depot/proton" "$verb" "$@" "${BL_EXTRA_ARGS[@]}"
 fi
 echo "droiddeck-proton: no ARM64 Proton depot yet - the client downloads one as this tool's dependency; retry the launch once it has" >&2
 exit 1
@@ -372,7 +372,7 @@ bl_libpath
 BL_STORE_PROTON="$here/%s"; export BL_STORE_PROTON
 bl_store_launch "$@"
 BL_STORE_ARGS=("$@")
-bl_run ${BL_TASKSET:-} /usr/local/bin/droiddeck-game-env "$BL_STORE_PROTON" "$verb" "$@" "${BL_EXTRA_ARGS[@]}"
+bl_run ${BL_TASKSET:-} "${DROIDDECK_GAME_ENV_LAUNCHER:-/usr/local/bin/droiddeck-game-env}" "$BL_STORE_PROTON" "$verb" "$@" "${BL_EXTRA_ARGS[@]}"
 """
 EXTRA_COMPAT_TOOL_VDF = """"compatibilitytools"
 {

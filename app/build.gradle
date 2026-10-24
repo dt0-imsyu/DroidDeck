@@ -72,7 +72,8 @@ def variantSuffixes = rootProject.file('tools/release/variants.txt').readLines()
 
 android {
     namespace 'com.droiddeck.launcher'
-    compileSdk 34
+    compileSdk = (project.findProperty('mavkCompileSdk') ?: '34').toString().toInteger()
+    if (project.hasProperty('mavkBuildTools')) buildToolsVersion = project.property('mavkBuildTools')
     ndkVersion project.findProperty('ndkVersion') ?: '27.3.13750724'
 
     defaultConfig {
@@ -128,6 +129,10 @@ android {
         debug {
             minifyEnabled false
             signingConfig signingConfigs.testkey
+            if (project.hasProperty('mavkExperimental')) {
+                applicationIdSuffix '.mavk'
+                versionNameSuffix '-mavk-experimental'
+            }
         }
         release {
             minifyEnabled false
@@ -189,7 +194,13 @@ tasks.named('preBuild').configure { dependsOn(stageRuntimeAssets) }
 def verifyRuntimeInputs = tasks.register('verifyRuntimeInputs', Exec) {
     mustRunAfter(stageSessionScripts, stageRuntimeAssets)
     workingDir rootProject.projectDir
-    commandLine 'python3', 'tools/release/runtime_inputs.py', 'verify'
+    if (project.hasProperty('mavkWslVerify')) {
+        commandLine 'wsl.exe', '-d', 'Ubuntu', '--exec', 'env',
+            'PATH=/mnt/e/Mavk/artifacts/droiddeck-build-tools-20261018/root/usr/bin:/usr/bin:/bin',
+            'python3', 'tools/release/runtime_inputs.py', 'verify'
+    } else {
+        commandLine 'python3', 'tools/release/runtime_inputs.py', 'verify'
+    }
 }
 tasks.configureEach { task ->
     if (task.name in ['packageDebug', 'packageRelease']) task.dependsOn(verifyRuntimeInputs)

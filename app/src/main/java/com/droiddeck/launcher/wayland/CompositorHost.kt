@@ -7,12 +7,15 @@ import com.droiddeck.launcher.session.SessionState
 object CompositorHost {
     @Volatile
     private var started = false
-    private var vsyncRunning = false
+    private val frameLoop: FrameLoop = FrameLoop(
+        post = { Choreographer.getInstance().postFrameCallback(vsync) },
+        cancel = { Choreographer.getInstance().removeFrameCallback(vsync) },
+        render = { WaylandCompositor.nativeVsync(it) },
+    )
 
     private val vsync = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
-            WaylandCompositor.nativeVsync(frameTimeNanos)
-            if (vsyncRunning) Choreographer.getInstance().postFrameCallback(this)
+            frameLoop.onFrame(frameTimeNanos)
         }
     }
 
@@ -81,13 +84,11 @@ object CompositorHost {
     }
 
     private fun resumeVsync() {
-        if (vsyncRunning) return
-        vsyncRunning = true
-        Choreographer.getInstance().postFrameCallback(vsync)
+        frameLoop.start()
     }
 
     private fun pauseVsync() {
-        vsyncRunning = false
+        frameLoop.stop()
     }
 
     fun newSession() {

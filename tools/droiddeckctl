@@ -294,6 +294,10 @@ def pacing_summary(text: str, package: str = PACKAGE) -> dict:
     are summed. A game's own fps counter does not show any of this - it counts frames handed over, not
     frames shown, and 60 handed over can be 48 on screen with one in four held for two refreshes.
     """
+    # ADB on Windows can return CRLF even for Android shell dumps. Normalize
+    # before matching complete histogram header lines; otherwise live layers
+    # are incorrectly reported as NO_FRAMES.
+    text = text.replace("\r\n", "\n")
     records = {"game": [], "surface": []}
     for part in re.split(r"^layerName = ", text, flags=re.M)[1:]:
         name, _, body = part.partition("\n")

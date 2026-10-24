@@ -288,6 +288,14 @@ class DroiddeckctlTest(FakeAdbTest):
         self.assertEqual(1800, summary["frames"])
         self.assertEqual(3, summary["offCadence"])
 
+    def test_pacing_accepts_adb_crlf_and_variant_package(self):
+        package = "com.droiddeck.launcher.mavk"
+        source = TIMESTATS_SURFACEVIEW.replace("com.droiddeck.launcher/", package + "/")
+        expected = ctl.pacing_summary(source, package)
+        actual = ctl.pacing_summary(source.replace("\n", "\r\n"), package)
+        self.assertTrue(actual["layers"])
+        self.assertEqual(expected, actual)
+
     def test_pacing_captures_then_turns_timestats_off(self):
         self.configure({}, timestats=TIMESTATS_SURFACEVIEW)
         with unittest.mock.patch.object(ctl.time, "sleep"):

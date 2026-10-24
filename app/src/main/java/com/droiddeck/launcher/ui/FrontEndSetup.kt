@@ -355,6 +355,31 @@ internal fun SetupPanel(
                         }
                         val device: @Composable () -> Unit = {
                             SettingsGroup(stringResource(R.string.setup_group_device)) {
+                                if (com.droiddeck.launcher.session.MavkExperimental.available(ctx)) {
+                                    var mavkEnabled by remember { mutableStateOf(com.droiddeck.launcher.session.MavkExperimental.selected(ctx)) }
+                                    ToggleRow(host, "mavk", stringResource(R.string.mavk_backend),
+                                        stringResource(R.string.mavk_backend_hint),
+                                        mavkEnabled, enabled = !com.droiddeck.launcher.session.SessionState.running) {
+                                        com.droiddeck.launcher.session.MavkExperimental.select(ctx, it)
+                                        mavkEnabled = it
+                                    }
+                                    if (mavkEnabled) {
+                                        var ahbDisplay by remember { mutableStateOf(com.droiddeck.launcher.session.MavkExperimental.ahbDisplay(ctx)) }
+                                        ToggleRow(host, "mavk-ahb-display", "Mavk AHB display (experimental)",
+                                            "Fullscreen SDR only. Restart DroidDeck to enable; turn off to use X11/SHM.",
+                                            ahbDisplay, enabled = !com.droiddeck.launcher.session.SessionState.running) {
+                                            com.droiddeck.launcher.session.MavkExperimental.selectAhbDisplay(ctx, it)
+                                            ahbDisplay = it
+                                        }
+                                        var hardwareUi by remember { mutableStateOf(com.droiddeck.launcher.session.MavkExperimental.steamHardwareUi(ctx)) }
+                                        ToggleRow(host, "mavk-steam-ui", stringResource(R.string.mavk_steam_ui),
+                                            stringResource(R.string.mavk_steam_ui_hint),
+                                            hardwareUi, enabled = !com.droiddeck.launcher.session.SessionState.running) {
+                                            com.droiddeck.launcher.session.MavkExperimental.selectSteamHardwareUi(ctx, it)
+                                            hardwareUi = it
+                                        }
+                                    }
+                                }
                                 ToggleRow(
                                     host, "home-screen", stringResource(R.string.setup_home),
                                     if (s.homeScreenEnabled) stringResource(R.string.setup_home_on) else stringResource(R.string.setup_home_off),

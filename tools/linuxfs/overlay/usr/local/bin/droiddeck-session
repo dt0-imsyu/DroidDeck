@@ -179,6 +179,32 @@ if [ -z "${BL_INSIDE:-}" ]; then
     wayland-info >/dev/null 2>&1 && break
     sleep 0.1
   done
+  if [ "${DROIDDECK_MAVK_DIRECT:-}" = 1 ] && [ -n "${DISPLAY:-}" ]; then
+    echo "== Mavk experimental: app-managed Xwayland, no Gamescope"
+    mavk_wm=${DROIDDECK_MAVK_RUNTIME:?}/openbox/root
+    if [ -x "$mavk_wm/usr/bin/openbox" ]; then
+      env -u LD_PRELOAD LD_LIBRARY_PATH="$mavk_wm/usr/lib:/usr/lib" \
+        XDG_DATA_DIRS="$mavk_wm/usr/share:/usr/share" \
+        "$mavk_wm/usr/bin/openbox" --sm-disable \
+        --config-file "$mavk_wm/etc/xdg/openbox/rc.xml" &
+      mavk_wm_pid=$!
+      mavk_wm_ready=0
+      for _ in $(seq 1 100); do
+        kill -0 "$mavk_wm_pid" 2>/dev/null || break
+        if xprop -root _NET_SUPPORTING_WM_CHECK 2>/dev/null | grep -q 'window id # 0x'; then
+          mavk_wm_ready=1
+          break
+        fi
+        sleep 0.1
+      done
+      [ "$mavk_wm_ready" = 1 ] || { echo "== Mavk window manager did not become ready"; exit 70; }
+      echo "== Mavk window manager ready"
+    else
+      echo "== Mavk window manager is not staged"; exit 66
+    fi
+    export BL_INSIDE=1
+    exec "$0" "$mode" "$@"
+  fi
   if [ "$mode" = lxqt ]; then
     step "starting the desktop"
     start_agent --no-focus
@@ -258,7 +284,7 @@ if [ -z "$bl_system_presentation" ]; then
   [ "${DROIDDECK_SYSTEM_VULKAN_GPU:-}" = mali ] && bl_system_presentation=x11-shm
 fi
 if [ "$bl_system_presentation" = x11-shm ] && [ -n "$bl_system_runtime" ]; then
-  export VK_LAYER_PATH="$bl_system_runtime/wsi:$bl_system_runtime/lib${DROIDDECK_HYBRIS_LAYER_PATH:+:$DROIDDECK_HYBRIS_LAYER_PATH}"
+  export VK_LAYER_PATH="$bl_system_runtime/wsi:${DROIDDECK_MAVK_LAYER_PATH:+$DROIDDECK_MAVK_LAYER_PATH:}$bl_system_runtime/lib${DROIDDECK_HYBRIS_LAYER_PATH:+:$DROIDDECK_HYBRIS_LAYER_PATH}"
   export VK_INSTANCE_LAYERS="VK_LAYER_window_system_integration:${DROIDDECK_HYBRIS_SESSION_LAYERS:-VK_LAYER_HYBRIS_compat}"
   export WSI_X11_FORCE_SHM=1 ENABLE_GAMESCOPE_WSI=0 VK_LOADER_LAYERS_DISABLE='*gamescope*'
   unset DISABLE_WSI_LAYER
@@ -331,6 +357,12 @@ case $mode in
     droiddeck-steam-install || exit $?
     step "Steam client ready"
     steam_root=$XDG_DATA_HOME/Steam
+    mavk_ui_mesa=
+    if [ -n "${DROIDDECK_MAVK_RUNTIME:-}" ] && [ "${DROIDDECK_MAVK_STEAM_GL:-}" = 1 ]; then
+      mavk_ui_mesa=$DROIDDECK_MAVK_RUNTIME/mesa25
+      [ -s "$mavk_ui_mesa/lib/libgallium-25.1.9.so" ] || { echo 'Mavk Steam GL payload missing'; exit 72; }
+      export BL_STEAM_CEF_SOFTWARE=0 BL_STEAM_GL_PRESENT=1
+    fi
     if [ -s "$HOME/.bl-proton-extra" ]; then
       _bl_left=$HOME/.bl-proton-extra.left
       : > "$_bl_left"
@@ -636,6 +668,7 @@ BUSCONF
         echo "== steam: system Vulkan WSI layer unavailable; using software CEF compositing"
       fi
     fi
+    [ -z "$mavk_ui_mesa" ] || bl_steam_angle=gl
     # Decky
     decky_loader=$HOME/homebrew/services/PluginLoader
     if [ -f "$HOME/.droiddeck-decky-enabled" ] && [ -x "$decky_loader" ]; then
@@ -899,9 +932,24 @@ BUSCONF
       fi
       steam_started=$SECONDS
       # Keep Valve's optional webhelper CPU pinning from aborting browser startup.
+      bl_client_graphics=()
+      if [ -n "${DROIDDECK_MAVK_RUNTIME:-}" ]; then
+        if [ -n "$mavk_ui_mesa" ]; then
+          bl_client_graphics=(GALLIUM_DRIVER=zink MESA_LOADER_DRIVER_OVERRIDE=zink
+                              LIBGL_ALWAYS_SOFTWARE=0 LIBGL_KOPPER_DRI2=true ZINK_DESCRIPTORS=lazy
+                              "LD_LIBRARY_PATH=$mavk_ui_mesa/lib:$LD_LIBRARY_PATH"
+                              "DROIDDECK_MAVK_UI_PREVIOUS_DESCRIPTORS=${ZINK_DESCRIPTORS-}"
+                              "DROIDDECK_MAVK_UI_MESA=$mavk_ui_mesa")
+          echo '== Mavk: experimental hardware OpenGL Steam UI; native Vulkan features unchanged'
+        else
+          bl_client_graphics=(GALLIUM_DRIVER=llvmpipe MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
+                            LIBGL_ALWAYS_SOFTWARE=1 DROIDDECK_MAVK_UI_SOFTWARE=1)
+          echo "== Mavk: software OpenGL for the Steam UI only; game environment restores hardware Vulkan"
+        fi
+      fi
       PATH="$bl_steam_path" \
       BL_STEAM_WEBHELPER="$steam_root/steamrtarm64/steamwebhelper" \
-      "$steam_root/steamrtarm64/steam" "${_bl_ui[@]}" "${_bl_cdp[@]}" "${_bl_lang[@]}" -clientbeta "$steam_channel" \
+      env "${bl_client_graphics[@]}" "$steam_root/steamrtarm64/steam" "${_bl_ui[@]}" "${_bl_cdp[@]}" "${_bl_lang[@]}" -clientbeta "$steam_channel" \
         -no-cef-sandbox -cef-ozone-platform=x11 "${_bl_cef[@]}" "$@"
       rc=$?
       steam_ran=$((SECONDS - steam_started))

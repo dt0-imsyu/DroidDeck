@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import json
+import hashlib
 import os
 import re
 import runpy
@@ -465,7 +466,8 @@ def system_graphics_launch(command, env):
         layers = [name for name in layers if name != PLACED_MEMORY_LAYER] + [PLACED_MEMORY_LAYER]
         result[PLACED_MEMORY_SETTING] = "1"
     result.update({
-        "VK_LAYER_PATH": os.pathsep.join(ordered_values(str(directory / "wsi"), str(directory / "lib"),
+        "VK_LAYER_PATH": os.pathsep.join(ordered_values(str(directory / "wsi"),
+                                                       env.get("DROIDDECK_MAVK_LAYER_PATH", ""), str(directory / "lib"),
                                                        env.get("DROIDDECK_HYBRIS_LAYER_PATH", ""),
                                                        env.get("VK_LAYER_PATH", ""))),
         "VK_INSTANCE_LAYERS": os.pathsep.join(layers),
@@ -480,6 +482,66 @@ def system_graphics_launch(command, env):
         result["HYBRIS_BC_TEXTURES"] = "dxvk"
         result.pop("PROTON_USE_WINED3D", None)
         command = [str(wrapper), *command]
+    mavk = env.get("DROIDDECK_MAVK_RUNTIME")
+    if mavk:
+        own = Path(mavk)
+        for name in ("run-proton.py", "proton_d3d11.py", "pe/libmavk-wine-protection-trace.so"):
+            if not (own / name).is_file():
+                raise SystemGraphicsError("missing experimental Mavk component: " + name)
+        if dxvk != "managed":
+            raise SystemGraphicsError("experimental Mavk requires the managed Proton wrapper")
+        command[0] = str(own / "run-proton.py")
+        image_roots = []
+        prefix = env.get("STEAM_COMPAT_DATA_PATH")
+        if prefix and Path(prefix).is_absolute():
+            image_roots.append(str(Path(prefix) / "pfx/drive_c/windows"))
+        proton = Path(command[1] if dxvk == "managed" else command[0])
+        image_roots.append(str(proton.parent / "files/lib/wine"))
+        executable = Path(command[3] if dxvk == "managed" else command[2])
+        if executable.is_absolute():
+            image_roots.append(str(executable.parent))
+        result.update({
+            "MAVK_LAYER_GUARDS": "1", "MAVK_SAREK_NULL_PROBE": "1",
+            "MAVK_SAREK_LEGACY_SPIRV": "1", "MAVK_SAREK_BC_FORMATS": "1",
+            "MAVK_WINE_PE_READ_FALLBACK": "1",
+            "MAVK_WINE_PE_ROOTS": ":".join(image_roots),
+            "MAVK_WINE_GUEST_ROOT": env["DROIDDECK_MAVK_GUEST_ROOT"],
+            "LD_PRELOAD": str(own / "pe/libmavk-wine-protection-trace.so") +
+                          (":" + result["LD_PRELOAD"] if result.get("LD_PRELOAD") else ""),
+        })
+        if env.get("DROIDDECK_MAVK_NATIVE_VULKAN") == "1":
+            result["MAVK_LAYER_GUARDS"] = "0"
+            result["MAVK_SAREK_NULL_PROBE"] = "0"
+            print("Mavk: native Vulkan profile; driver robustness/features unchanged", file=sys.stderr)
+        result.pop("DXVK_MALI_COMPAT", None)
+        ui_mesa = result.pop("DROIDDECK_MAVK_UI_MESA", None)
+        if ui_mesa:
+            ui_library = str(Path(ui_mesa) / "lib")
+            result["LD_LIBRARY_PATH"] = ":".join(
+                part for part in result.get("LD_LIBRARY_PATH", "").split(":") if part != ui_library)
+            previous_descriptors = result.pop("DROIDDECK_MAVK_UI_PREVIOUS_DESCRIPTORS", "")
+            if previous_descriptors:
+                result["ZINK_DESCRIPTORS"] = previous_descriptors
+            else:
+                result.pop("ZINK_DESCRIPTORS", None)
+        if result.pop("DROIDDECK_MAVK_UI_SOFTWARE", None) == "1":
+            result.pop("LIBGL_ALWAYS_SOFTWARE", None)
+            result["GALLIUM_DRIVER"] = "zink"
+            result["MESA_LOADER_DRIVER_OVERRIDE"] = "zink"
+        private_wsi = env.get("DROIDDECK_MAVK_XCB_AHB_WSI")
+        if private_wsi:
+            private = Path(private_wsi)
+            digest = env.get("DROIDDECK_MAVK_XCB_AHB_SHA256", "")
+            library = private / "libVkLayer_window_system_integration.so"
+            marker = Path(env.get("XDG_RUNTIME_DIR", "/nonexistent")) / "mavk-explicit-ahb.enable"
+            if (not private.is_absolute() or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                    or not library.is_file() or not (private / "VkLayer_window_system_integration.json").is_file()
+                    or hashlib.sha256(library.read_bytes()).hexdigest() != digest or not marker.is_file()):
+                raise SystemGraphicsError("private XCB/AHB WSI requires a pinned library and opted-in compositor")
+            result["VK_LAYER_PATH"] = str(private) + ":" + result["VK_LAYER_PATH"]
+            result.update(MAVK_WSI_AHB_ALLOC_ONLY="1", MAVK_WSI_AHB_PRESENT="1", MAVK_WSI_XCB_AHB_PROXY="1")
+            result.pop("WSI_X11_FORCE_SHM", None)
+            print("Mavk: experimental XCB/AHB rendering; input routing not yet verified", file=sys.stderr)
     for name in ("DISABLE_WSI_LAYER", "ENABLE_VK_LAYER_VALVE_steam_fossilize_1"):
         result.pop(name, None)
     return command, result

@@ -29,6 +29,63 @@ def config_text(entries):
 
 
 class SystemGraphicsLaunchTest(unittest.TestCase):
+    def test_private_xcb_wsi_is_pinned_opt_in_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, _ = self.runtime(root)
+            own = root / "mavk"
+            (own / "pe").mkdir(parents=True)
+            for name in ("run-proton.py", "proton_d3d11.py", "pe/libmavk-wine-protection-trace.so"):
+                (own / name).write_bytes(b"test")
+            private = root / "private-wsi"
+            private.mkdir()
+            (private / "libVkLayer_window_system_integration.so").write_bytes(b"private")
+            (private / "VkLayer_window_system_integration.json").write_text("{}")
+            marker = root / "mavk-explicit-ahb.enable"
+            env = dict(DROIDDECK_SYSTEM_VULKAN_RUNTIME=str(runtime),
+                       DROIDDECK_SYSTEM_VULKAN_DXVK="managed", DROIDDECK_SYSTEM_VULKAN_GPU="mali",
+                       DROIDDECK_MAVK_RUNTIME=str(own), DROIDDECK_MAVK_GUEST_ROOT="/rootfs",
+                       STEAM_COMPAT_DATA_PATH="/compatdata/42", XDG_RUNTIME_DIR=str(root))
+            command = ["/proton", "waitforexitandrun", "/game.exe"]
+            _, normal = MODULE["system_graphics_launch"](command, env)
+            self.assertNotIn("MAVK_WSI_XCB_AHB_PROXY", normal)
+            env.update(DROIDDECK_MAVK_XCB_AHB_WSI=str(private),
+                       DROIDDECK_MAVK_XCB_AHB_SHA256=hashlib.sha256(b"private").hexdigest())
+            with self.assertRaises(MODULE["SystemGraphicsError"]):
+                MODULE["system_graphics_launch"](command, env)
+            marker.write_text("2560 1600\n")
+            _, selected = MODULE["system_graphics_launch"](command, env)
+            self.assertEqual(selected["VK_LAYER_PATH"].split(":")[0], str(private))
+            self.assertEqual(selected["MAVK_WSI_XCB_AHB_PROXY"], "1")
+            self.assertNotIn("WSI_X11_FORCE_SHM", selected)
+            env["DROIDDECK_MAVK_XCB_AHB_SHA256"] = "0" * 64
+            with self.assertRaises(MODULE["SystemGraphicsError"]):
+                MODULE["system_graphics_launch"](command, env)
+    def test_mavk_steam_ui_mesa_does_not_leak_into_proton(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, _ = self.runtime(root)
+            mavk = root / "mavk"
+            (mavk / "pe").mkdir(parents=True)
+            for name in ("run-proton.py", "proton_d3d11.py", "pe/libmavk-wine-protection-trace.so"):
+                (mavk / name).write_bytes(b"test")
+            ui = str(mavk / "mesa25")
+            env = {"DROIDDECK_SYSTEM_VULKAN_RUNTIME": str(runtime),
+                   "DROIDDECK_SYSTEM_VULKAN_GPU": "mali", "DROIDDECK_SYSTEM_VULKAN_DXVK": "managed",
+                   "DROIDDECK_MAVK_RUNTIME": str(mavk), "DROIDDECK_MAVK_GUEST_ROOT": "/rootfs",
+                   "STEAM_COMPAT_DATA_PATH": "/compatdata/42", "DROIDDECK_MAVK_UI_MESA": ui,
+                   "LD_LIBRARY_PATH": "/steam:" + ui + "/lib:/keep", "ZINK_DESCRIPTORS": "lazy"}
+            command = ["/custom/proton", "waitforexitandrun", "/games/game.exe"]
+            for previous in ("", "auto"):
+                with self.subTest(previous=previous):
+                    _, result = MODULE["system_graphics_launch"](
+                        command, dict(env, DROIDDECK_MAVK_UI_PREVIOUS_DESCRIPTORS=previous))
+                    self.assertNotIn(ui + "/lib", result["LD_LIBRARY_PATH"].split(":"))
+                    self.assertIn("/keep", result["LD_LIBRARY_PATH"].split(":"))
+                    self.assertIn("/steam", result["LD_LIBRARY_PATH"].split(":"))
+                    self.assertNotIn("DROIDDECK_MAVK_UI_MESA", result)
+                    self.assertEqual(result.get("ZINK_DESCRIPTORS", ""), previous)
+
     def runtime(self, root, payload="dxvk", architectures=("x32", "x64")):
         runtime = root / "system_vulkan" / ("a" * 64)
         files = ["run-proton.py", "lib/libVkLayer_hybris_compat.so",
@@ -1066,7 +1123,7 @@ class GameEnvironmentTest(unittest.TestCase):
     def test_both_proton_wrappers_call_environment_launcher(self):
         for script in (COMPAT["LAUNCHER_SH"], COMPAT["EXTRA_WRAPPER_SH"] % "proton"):
             subprocess.run(["bash", "-n"], input=script, text=True, check=True)
-            self.assertIn('bl_run ${BL_TASKSET:-} /usr/local/bin/droiddeck-game-env', script)
+            self.assertIn('bl_run ${BL_TASKSET:-} "${DROIDDECK_GAME_ENV_LAUNCHER:-/usr/local/bin/droiddeck-game-env}"', script)
 
     def test_wrappers_preload_the_session_library_before_the_input_shim(self):
         overlay = "/root/.local/share/Steam/ubuntu12_64/gameoverlayrenderer.so"

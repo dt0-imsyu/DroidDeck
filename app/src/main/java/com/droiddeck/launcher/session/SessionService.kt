@@ -441,12 +441,21 @@ class SessionService : Service() {
         networkLink.attach(this)
         networkLink.publish()
         components.add(networkLink)
+        if (MavkExperimental.enabled(this)) {
+            components.add(MavkXwaylandComponent(this, runtimeDir, sessionRoot, sessionDir, size.first, size.second) { teardown(it) })
+        }
         if (gen != sessionGen || !SessionState.running) {
             Log.i(TAG, "session stopped while it was starting; not launching it")
             if (gen == sessionGen) components.clear()
             return
         }
-        components.forEach { it.start() }
+        try {
+            components.forEach { it.start() }
+        } catch (error: Exception) {
+            Log.e(TAG, "Could not start a session component", error)
+            stopSession(-1)
+            return
+        }
 
         val line = command.joinToString(" ") {
             it.replace("\\", "\\\\").replace(" ", "\\ ")
@@ -567,6 +576,7 @@ class SessionService : Service() {
             com.droiddeck.launcher.core.ZramSupport.supported()) guest.add("BL_ZRAM=1")
         guest.add("BANNER_AUDIO_DIRECT_DECAY=0")
         extraEnv().forEach { guest.add(it) }
+        if (MavkExperimental.enabled(this)) MavkExperimental.configure(this, guest)
         com.droiddeck.launcher.agent.AgentEnv.beginSession(this).forEach { guest.add(it) }
         val clientPinned = steamHere && SessionPrefs.clientCpusOverride(this)
         if (clientPinned) {

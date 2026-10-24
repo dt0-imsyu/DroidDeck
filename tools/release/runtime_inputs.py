@@ -21,7 +21,8 @@ SOURCE_PATHS = ['app/build.gradle', 'app/src/main/cpp/fakeinput_steam.cpp', 'app
                 'tools/release/runtime_inputs.py', 'app/src/main/assets/desktop-removal',
                 'tools/quest', 'tools/vr/src', 'tools/vr/driver_droiddeck', 'tools/vr/layer', 'tools/vr/build.sh',
                 'app/src/main/cpp/adrenotools/src/hook/kgsl.h',
-                'app/src/main/assets/graphics_driver/adrenotools-turnip25.1.0.tzst']
+                'app/src/main/assets/graphics_driver/adrenotools-turnip25.1.0.tzst',
+                'app/src/main/assets/mavk']
 
 
 def digest(path):
@@ -45,7 +46,7 @@ def sources(root):
 
 def outputs(root):
     result = {}
-    for tree in ['linuxfs', 'directaudio', 'droiddeck-esync', 'desktop-removal', 'hybris']:
+    for tree in ['linuxfs', 'directaudio', 'droiddeck-esync', 'desktop-removal', 'hybris', 'mavk']:
         base = root / 'app/src/main/assets' / tree
         for path in base.rglob('*'):
             if path.is_file() and not any(part.startswith('.') for part in path.relative_to(base).parts):

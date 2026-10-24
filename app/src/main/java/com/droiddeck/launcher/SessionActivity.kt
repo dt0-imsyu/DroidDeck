@@ -1273,6 +1273,10 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             Log.i(TAG, "hdr: " + (if (on) "on" else if (wanted) "wanted but ${probe.reason}" else "off") + " · display ${probe.formats.ifEmpty { "SDR" }}")
         }
         com.droiddeck.launcher.gpu.DriverSetupLog.write(this, "compositor.start driver=$driverId")
+        com.droiddeck.launcher.session.MavkExperimental.prepareDisplay(
+            this, runtimeDir, size.first, size.second,
+            SessionPrefs.prefMode(intent.getStringExtra(SessionService.EXTRA_MODE) ?: SessionService.MODE_STEAM),
+        )
         CompositorHost.startOrAttach(
             holder.surface, runtimeDir.path,
             driverId?.let { turnip.driverPath(it) }, driverId?.let { turnip.libraryName(it) },

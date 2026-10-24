@@ -205,6 +205,7 @@ struct surface {
     int buf_w, buf_h, has_content;
     int buf_alpha;
     int opaque[4], pending_opaque[4], pending_opaque_set;
+    int input_empty, pending_input_empty, pending_input_set;
     int src_set, dst_set;
     float src[4];
     int dst[2];
@@ -497,6 +498,23 @@ const struct wl_buffer_interface dbuf_buffer_impl = {
     .destroy = dbuf_buffer_destroy_req,
 };
 
+static void ahb_layer_buffer_destroyed(struct wl_resource *r) {
+    dmabuf_buffer_unref(wl_resource_get_user_data(r));
+}
+
+struct wl_resource *droiddeck_create_ahb_layer_buffer(struct wl_client *c,uint32_t id,uint32_t w,uint32_t h) {
+    if (!w || !h || w > 8192 || h > 8192) return NULL;
+    struct dmabuf_buffer *b = calloc(1,sizeof(*b));
+    if (!b) { wl_client_post_no_memory(c); return NULL; }
+    b->refs=1;b->width=(int32_t)w;b->height=(int32_t)h;
+    b->format=DRM_ABGR8888;b->modifier=MOD_INVALID;b->import_failed=1;
+    for(int i=0;i<MAX_PLANES;i++)b->fd[i]=-1;
+    struct wl_resource *r=wl_resource_create(c,&wl_buffer_interface,1,id);
+    if(!r){free(b);wl_client_post_no_memory(c);return NULL;}
+    wl_resource_set_implementation(r,&dbuf_buffer_impl,b,ahb_layer_buffer_destroyed);
+    return r;
+}
+
 static struct dmabuf_buffer *get_dmabuf(struct wl_resource *buffer) {
     if (buffer && wl_resource_instance_of(buffer, &wl_buffer_interface, &dbuf_buffer_impl))
         return wl_resource_get_user_data(buffer);
@@ -692,7 +710,7 @@ static void take_dmabuf(struct surface *s, struct dmabuf_buffer *b, struct wl_re
     s->buf_w = b->width;
     s->buf_h = b->height;
     s->buf_alpha = (b->format & 0xff) == 'A';
-    s->has_content = b->img != NULL;
+    s->has_content = b->img != NULL || ahb_swapchain_has_ahb(b);
     if (!repeat) g_stat_dmabuf++;
     const int announced_now = !s->announced_vulkan;
     if (!s->announced_vulkan) {
@@ -750,6 +768,13 @@ void droiddeck_dmabuf_size(const struct dmabuf_buffer *b, int *w, int *h) { *w =
 void **droiddeck_dmabuf_ahb_slot(struct dmabuf_buffer *b) { return &b->ahb_state; }
 void droiddeck_dmabuf_ref(struct dmabuf_buffer *b) { b->refs++; }
 void droiddeck_dmabuf_unref(struct dmabuf_buffer *b) { dmabuf_buffer_unref(b); }
+int droiddeck_dmabuf_make_layer_only(struct dmabuf_buffer *b) {
+    if (!b || b->refs != 1 || b->n_planes || b->ahb_state) return -1;
+    vkp_image_destroy(b->img);
+    b->img = NULL;
+    b->import_failed = 1;
+    return 0;
+}
 void droiddeck_release_buffer(struct surface *s, struct wl_resource *buffer, int paced, int64_t since_ns) {
     if (paced && s) release_buffer(s, buffer, since_ns);
     else { wl_buffer_send_release(buffer); perf_note_release(since_ns); }
@@ -864,7 +889,12 @@ static void surface_set_opaque(struct wl_client *c, struct wl_resource *r,
     if (ci) ci->declares_opaque = 1;
 }
 static void surface_set_input(struct wl_client *c, struct wl_resource *r,
-                              struct wl_resource *region) {}
+                              struct wl_resource *region) {
+    struct surface *s = wl_resource_get_user_data(r);
+    struct region *rg = region ? wl_resource_get_user_data(region) : NULL;
+    s->pending_input_empty = rg && !rg->set;
+    s->pending_input_set = 1;
+}
 
 static void send_toplevel_configure(struct surface *s);
 
@@ -928,6 +958,10 @@ static void surface_drop_idle(struct surface *s) {
 static void surface_commit(struct wl_client *c, struct wl_resource *r) {
     struct surface *s = wl_resource_get_user_data(r);
     struct surface *child;
+    if (s->pending_input_set) {
+        s->input_empty = s->pending_input_empty;
+        s->pending_input_set = 0;
+    }
 
     if (s->xdg_toplevel && !s->toplevel_committed) {
         s->toplevel_committed = 1;
@@ -1667,11 +1701,23 @@ static struct surface *ahb_layer_only_candidate(int scene_w, int scene_h) {
     if (wl_list_empty(&g_toplevels)) return NULL;
     s = wl_container_of(g_toplevels.prev, s, toplevel_link);
     if (!s->dmabuf_buf || s->dmabuf_buf->img || !ahb_swapchain_has_ahb(s->dmabuf_buf)) return NULL;
-    if ((g_desktop && !s->placed) || s->x != 0 || s->y != 0 || s->src_set || s->dst_set) return NULL;
+    /* An identity viewport (unset/full-buffer source, destination equal to the buffer)
+       must not exclude a fullscreen window from its display layer: SDL3 windows always
+       install one even when they never rescale anything. */
+    const int viewport_identity =
+        (!s->src_set || (s->src[0] == 0.0f && s->src[1] == 0.0f &&
+                         s->src[2] == (float)s->buf_w && s->src[3] == (float)s->buf_h)) &&
+        (!s->dst_set || (s->dst[0] == s->buf_w && s->dst[1] == s->buf_h));
+    if ((g_desktop && !s->placed) || s->x != 0 || s->y != 0 || !viewport_identity) return NULL;
     if (!wl_list_empty(&s->children)) return NULL;
     if (g_hide_shell && !strcmp(client_name(wl_resource_get_client(s->resource)), "explorer.exe")) return NULL;
     surface_size(s, &w, &h);
-    if (w != scene_w || h != scene_h || s->buf_w != scene_w || s->buf_h != scene_h) return NULL;
+    const int exact_size = w == scene_w && h == scene_h && s->buf_w == scene_w && s->buf_h == scene_h;
+    /* The display layer already maps the complete buffer onto the output rectangle. */
+    const int fullscreen_scale = s->fullscreen && w == s->buf_w && h == s->buf_h &&
+        w > 0 && h > 0 && scene_w > 0 && scene_h > 0 &&
+        (int64_t)w * scene_h == (int64_t)h * scene_w;
+    if (!exact_size && !fullscreen_scale) return NULL;
     return s;
 }
 
@@ -2129,6 +2175,7 @@ static struct seat_keyboard *keyboard_for(struct wl_client *client) {
 static struct surface *toplevel_at(double x, double y) {
     struct surface *s;
     wl_list_for_each_reverse(s, &g_toplevels, toplevel_link) {
+        if (s->input_empty) continue;
         int w, h, sx = s->placed ? s->x : 0, sy = s->placed ? s->y : 0;
         surface_size(s, &w, &h);
         if (x >= sx && y >= sy && x < sx + w && y < sy + h) return s;
@@ -2563,6 +2610,8 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
         g_ptr_x = x; g_ptr_y = y;
         if (k) {
             target = k->surface;
+        } else if ((target = ahb_layer_only_candidate(g_output_w, g_output_h)) && !target->input_empty) {
+            /* The layer covers the output, including pixels outside its source buffer. */
         } else if (g_desktop) {
             target = g_desktop;
         } else {
@@ -2887,11 +2936,15 @@ static void key_event(uint32_t evdev, int pressed) {
     struct surface *target = NULL;
     struct wl_resource *ime = droiddeck_ime_target();
     if (ime) target = wl_resource_get_user_data(ime);
-    if (!target && g_key_target && g_key_target->mapped && g_key_target != g_desktop) target = g_key_target;
-    if (!target) target = g_desktop;
+    if (target && !keyboard_for(wl_resource_get_client(target->resource))) target = NULL;
+    if (!target && g_key_target && g_key_target->mapped && g_key_target != g_desktop &&
+        keyboard_for(wl_resource_get_client(g_key_target->resource))) target = g_key_target;
+    if (!target && g_desktop && keyboard_for(wl_resource_get_client(g_desktop->resource))) target = g_desktop;
     if (!target) {
         struct surface *s;
-        wl_list_for_each_reverse(s, &g_toplevels, toplevel_link) { target = s; break; }
+        wl_list_for_each_reverse(s, &g_toplevels, toplevel_link) {
+            if (keyboard_for(wl_resource_get_client(s->resource))) { target = s; break; }
+        }
     }
     if (!target) return;
     struct wl_client *client = wl_resource_get_client(target->resource);
@@ -3082,6 +3135,16 @@ static void test_input_line(const char *line) {
         return;
     }
     if (n < 3) return;
+    if (!strcmp(cmd, "output")) {
+        const char *rt = getenv("XDG_RUNTIME_DIR"), suffix[] = "/mavk-window/run";
+        const size_t len = rt ? strlen(rt) : 0;
+        if (len < sizeof(suffix)-1 || strcmp(rt+len-(sizeof(suffix)-1), suffix)) return;
+        if (!(x >= 320 && x <= 4096 && y >= 240 && y <= 4096)) return;
+        if (x != (int)x || y != (int)y || (uint64_t)(int)x*(int)y > 8388608) return;
+        g_output_w = (int)x; g_output_h = (int)y;
+        output_resized();
+        return;
+    }
     if (!strcmp(cmd, "move")) pointer_event(x, y, 0, 0);
     else if (!strcmp(cmd, "rel")) pointer_delta(x, y);
     else if (!strcmp(cmd, "down")) pointer_event(x, y, BTN_LEFT, 1);

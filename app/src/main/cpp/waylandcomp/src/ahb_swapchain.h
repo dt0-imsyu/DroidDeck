@@ -26,6 +26,8 @@ void droiddeck_dmabuf_size(const struct dmabuf_buffer *b, int *w, int *h);
 void **droiddeck_dmabuf_ahb_slot(struct dmabuf_buffer *b);
 void droiddeck_dmabuf_ref(struct dmabuf_buffer *b);
 void droiddeck_dmabuf_unref(struct dmabuf_buffer *b);
+int droiddeck_dmabuf_make_layer_only(struct dmabuf_buffer *b);
+struct wl_resource *droiddeck_create_ahb_layer_buffer(struct wl_client *c,uint32_t id,uint32_t w,uint32_t h);
 void droiddeck_release_buffer(struct surface *s, struct wl_resource *buffer, int paced, int64_t since_ns);
 void droiddeck_request_redraw(void);
 void droiddeck_surface_describe(const struct surface *s, char *out, size_t size);

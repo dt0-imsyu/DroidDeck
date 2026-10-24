@@ -68,6 +68,36 @@ class AgentError(Exception):
         self.code = code
 
 
+def x_authority(number):
+    path = os.environ.get("XAUTHORITY")
+    if not path:
+        return b"", b""
+    data = Path(path).read_bytes()
+    if len(data) > 65536:
+        raise OSError("X authority file exceeds limit")
+    offset = 0
+    while offset < len(data):
+        if offset + 2 > len(data):
+            raise OSError("Truncated X authority record")
+        family = struct.unpack_from(">H", data, offset)[0]
+        offset += 2
+        fields = []
+        for _ in range(4):
+            if offset + 2 > len(data):
+                raise OSError("Truncated X authority field")
+            size = struct.unpack_from(">H", data, offset)[0]
+            offset += 2
+            if offset + size > len(data):
+                raise OSError("Truncated X authority data")
+            fields.append(data[offset:offset + size])
+            offset += size
+        address, display, name, cookie = fields
+        if (family == 65535 or (family == 256 and address == socket.gethostname().encode())) and \
+                display == number.encode() and name == b"MIT-MAGIC-COOKIE-1" and 1 <= len(cookie) <= 256:
+            return name, cookie
+    raise OSError("No matching X authority cookie for display " + number)
+
+
 
 class X:
     """One connection to an Xwayland server. The rootfs has xprop but no python X library."""
@@ -86,7 +116,9 @@ class X:
                 self.s.close()
         else:
             raise last
-        self.s.sendall(struct.pack("<BxHHHHxx", 0x6C, 11, 0, 0, 0))
+        name, cookie = x_authority(num)
+        self.s.sendall(struct.pack("<BxHHHHxx", 0x6C, 11, 0, len(name), len(cookie)) +
+                       name + b"\0" * (-len(name) % 4) + cookie + b"\0" * (-len(cookie) % 4))
         head = self._read(8)
         if head[0] != 1:
             raise OSError("X connection refused on " + display)

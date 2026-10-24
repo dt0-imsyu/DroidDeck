@@ -23,7 +23,7 @@
     DEALINGS IN THE SOFTWARE.
   </copyright>
 
-  <interface name="banner_ahb_v1" version="2">
+  <interface name="banner_ahb_v1" version="3">
     <description summary="Android gralloc buffers behind dma-buf wl_buffers">
       Zero-copy window layers on Android. A Vulkan swapchain image that the
       client allocated as an Android AHardwareBuffer (gralloc) is still shared
@@ -100,6 +100,67 @@
         it; until it is, its buffers are shown as before.
       </description>
       <arg name="enabled" type="uint" summary="1 = gralloc swapchain images wanted, 0 = not"/>
+    </event>
+
+    <request name="attach_explicit" since="3">
+      <description summary="associate an AHB with explicit fence synchronization">
+        Experimental fullscreen-only path. Like attach, but accepts a fresh,
+        never-attached android_wlegl wl_buffer without a dma-buf
+        file descriptor. Each new buffer use requires set_acquire_fence or
+        set_acquire_ready before wl_surface.commit. The client must wait on the
+        fenced_release dependency before writing the buffer again. Receipt of
+        wl_buffer.release alone does not mean that dependency has signaled.
+        The association uses this banner_ahb_v1 object for release events; keep
+        it alive until all associated buffers have been retired.
+      </description>
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+      <arg name="socket" type="fd"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="stride" type="uint"/>
+      <arg name="image_count" type="uint"/>
+    </request>
+
+    <request name="set_acquire_fence" since="3">
+      <description summary="GPU dependency for the next use of this buffer">
+        fence is a Linux sync_file. This request transfers one descriptor to
+        the compositor; the caller retains ownership of its original descriptor.
+        Only one acquire dependency may be pending per buffer. The buffer must
+        not still be in use by the compositor.
+      </description>
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+      <arg name="fence" type="fd"/>
+    </request>
+    <request name="set_acquire_ready" since="3">
+      <description summary="next buffer use has already completed on the producer">
+        Equivalent to an already-signaled SYNC_FD payload, not permission to
+        omit a dependency for unfinished GPU work.
+      </description>
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+    </request>
+    <request name="create_buffer" since="3">
+      <description summary="create an AHB-native fullscreen buffer without dma-buf metadata">
+        The socket carries one AHardwareBuffer handle sent with the public NDK
+        API. Only unprotected single-layer RGBA8 buffers with compositor-overlay
+        usage are accepted. The buffer uses the explicit synchronization rules
+        above. It has no ordinary compositor-copy fallback; use a fullscreen
+        surface without effects or child windows. Clients must retain their
+        original presentation backend for unsupported configurations. This
+        experimental version is advertised only when explicitly enabled.
+      </description>
+      <arg name="buffer" type="new_id" interface="wl_buffer"/>
+      <arg name="socket" type="fd"/>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+      <arg name="stride" type="uint"/>
+      <arg name="image_count" type="uint"/>
+    </request>
+    <event name="fenced_release" since="3">
+      <arg name="buffer" type="object" interface="wl_buffer"/>
+      <arg name="fence" type="fd"/>
+    </event>
+    <event name="immediate_release" since="3">
+      <arg name="buffer" type="object" interface="wl_buffer"/>
     </event>
   </interface>
 </protocol>
