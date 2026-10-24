@@ -50,7 +50,21 @@ provenance; Android-neutral helpers are under `adapters/android`. Do not copy
 unversioned libraries into an installed runtime. Build/package tooling must
 update the archive manifest, library receipt and version hash together.
 
-Installed local experimental APK: Mavk/recovery/2026-10-25/DroidDeck-Mavk-demo2.apk,
+Latest installed source-built experimental APK:
+Mavk/recovery/2026-10-25/DroidDeck-Mavk-source-demo.apk,
+SHA256675e9cb6f83a0a76d7ae199158066f14a294dc9bade4711a5d43cb87331f97b3.
+Normal Gradle assembleDebug rebuilt Android Kotlin/Java/native/DEX/resources and
+verified every declared runtime input against the APK.70 missing prebuilt runtime
+inputs (100MB) were imported only after matching both a pinned preparation
+manifest and preserved APK. It is NOT a rebuild of all third-party dependencies.
+Optional Rust store downloader remains skipped, as absent in the previous working
+APK; this is a Steam-focused developer build, not a complete store/release build.
+
+AMD64 Win32/Wine consumer on that actual APK passed1920→1280→1920 ResizeBuffers,
+S_OK/11_0,exit0,CoreLiveZero,gaps0. No Steam or game prefix was started/changed.
+This is integration evidence, not a gameplay FPS claim.
+
+Previous rollback APK: Mavk/recovery/2026-10-25/DroidDeck-Mavk-demo2.apk,
 SHA256360c47655ba1acff64eae9ef68d69fb0c4f9c49376fcae21f9ef939103f36fdb.
 It is an asset/native rollup of the preserved known-good APK, not a clean full
 source APK. Complete Kotlin compilation and the native compositor target
@@ -67,7 +81,7 @@ Tests (Linux/WSL):81 game-environment and30 controller cases PASS. Mavk packagin
 and similarly test_droiddeckctl.py. Tests requiring fcntl/executable shebangs are
 Linux tests, not Windows-native Python tests.
 
-Final clean release build and full game regression are still pending. This
+Final complete release build and full game regression are still pending. This
 document does not label the prototype release-ready before those checks finish.
 
 ## Licensing / publication checklist

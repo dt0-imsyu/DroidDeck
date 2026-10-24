@@ -34,6 +34,34 @@ to retain unrelated entries. It is not claimed to be a clean Gradle release.
 Changing the signing identity requires an explicit migration/reinstall plan;
 do not uninstall the user's existing app/prefixes merely to test signing.
 
+### Subsequent ordinary Gradle build
+
+The latest source-demo APK675e9cb6 supersedes the rollup for developer checks.
+`assembleDebug` passed with `verifyRuntimeInputs` enabled; `runtime_inputs.py apk`
+then verified the actual packaged bytes. Android code/native targets are rebuilt;
+external dependencies remain pinned prebuilt inputs. Rust download engines are
+still absent as in the old baseline, not silently claimed working.
+
+`tools/release/import_runtime_seed.py` provides a bounded offline preparation
+path when an existing dependency cache is available. Required arguments: seed
+checkout, preparation manifest, preserved APK, both SHA256 pins. Default is a
+read-only audit; `--apply` creates only missing generated inputs, never tracked
+sources or a different existing file. Every byte must match BOTH pins. Current
+receipt: manifestfde81948ea86fb37f39105b9f3a5503df211f9c08feb46abf9c32d0461cd40f9,
+seed APK360c47655ba1acff64eae9ef68d69fb0c4f9c49376fcae21f9ef939103f36fdb,
+70inputs/100138173bytes. Run5 helper regressions with test_runtime_seed.py.
+
+After preparation, run the normal `runtime_inputs.py record` and `verify`; never
+disable package verification. Unix recipe hashes require LF byte-exact source
+files, now enforced for tools/ by .gitattributes. Merely changing release pins to
+hide CRLF differences would be wrong; the original pins are retained unchanged.
+
+Local assembly uses the compile command above, replacing compileDebugKotlin with
+assembleDebug and adding -PmavkWslVerify=true. The current Windows helper uses a
+read-only local zstd tools cache; other machines should use normal Linux build
+prerequisites. No cache, APK, installed container, Steam data or signing key is
+part of the source commits.
+
 ## Before public source/APK release
 
 1. Review the local commits and configure a NEW personal fork remote. Keep
