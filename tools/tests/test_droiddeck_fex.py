@@ -363,6 +363,17 @@ class LaunchTest(FexTestCase):
         guest = FEX["guest_environment"]({"portable": True}, {"XDG_RUNTIME_DIR": str(self.tmp / "missing")})
         self.assertEqual(guest["FEX_APP_DATA_LOCATION"], G["DATA_DIR"] + "/")
 
+    def test_steam_data_path_does_not_override_the_portable_server_directory(self):
+        env = {"STEAM_COMPAT_DATA_PATH": "/steam/compatdata/412220",
+               "SteamAppId": "412220", "STEAM_COMPAT_SHADER_PATH": "/steam/shaders/412220"}
+        guest = FEX["guest_environment"]({"portable": True}, env)
+        self.assertNotIn("STEAM_COMPAT_DATA_PATH", guest)
+        self.assertEqual(guest["SteamAppId"], "412220")
+        self.assertEqual(guest["STEAM_COMPAT_SHADER_PATH"], "/steam/shaders/412220")
+        self.assertEqual(env["STEAM_COMPAT_DATA_PATH"], "/steam/compatdata/412220")
+        system = FEX["guest_environment"]({"portable": False}, env)
+        self.assertEqual(system["STEAM_COMPAT_DATA_PATH"], env["STEAM_COMPAT_DATA_PATH"])
+
     def test_the_runtime_and_thunks_are_passed_to_fex(self):
         fex = {"portable": True, "rootfs": "/rt/files", "host_thunks": "/h", "guest_thunks": "/g", "thunks_db": "/db"}
         guest = FEX["guest_environment"](fex, {})

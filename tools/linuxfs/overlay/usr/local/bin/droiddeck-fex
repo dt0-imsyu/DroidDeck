@@ -426,6 +426,8 @@ def guest_environment(fex, env):
     result.setdefault("FEX_OUTPUTLOG", "stderr")
     if fex["portable"]:
         result["FEX_PORTABLE"] = "1"
+        # Steam FEX prioritizes this over FEX_APP_DATA_LOCATION for its socket.
+        result.pop("STEAM_COMPAT_DATA_PATH", None)
     else:
         result.pop("FEX_PORTABLE", None)
     for name in ("FEX_ROOTFS", "FEX_THUNKHOSTLIBS", "FEX_THUNKGUESTLIBS"):

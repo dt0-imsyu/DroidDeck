@@ -29,9 +29,12 @@ Adreno AHB portability is not yet hardware-tested.
 | Later1200p run |349 GPU=349zero-copy=349on-screen buffers/10s |
 | ARM64/AMD64 Wine D3D11 consumer | Rendered; standard ResizeBuffers passed |
 | Scaled pointer candidate | Native D3D11 received button/key; X server coordinates checked |
-| Half-Life2 / heavier gameplay | Pending; Steam currently reserved by owner |
+| Current Muck animated menu | ~34–35 displayed buffers/s, actual AHB, copy0 |
+| Same heavy Muck view,1600p→1200p |9.1→9.1 displayed buffers/s; not a resolution-only bottleneck |
+| Half-Life2 / heavier gameplay | HL2 not installed in the sole current library; no large download started |
+| DDNet Linux/FEX | Startup fails before Vulkan; no current gameplay PASS |
 
-These are not60unique gameFPS, a gameplay benchmark, or proof of gaming parity
+Steam/game use is authorized now. These are not60unique gameFPS, a complete benchmark, or proof of gaming parity
 with native Android/Turnip. No specific30FPS root cause is established yet.
 The same-menu resolution comparison does not support a fill-rate-only diagnosis.
 Existing diagnostic Sarek feature admissions are experimental, not Vulkan CTS
@@ -51,8 +54,17 @@ unversioned libraries into an installed runtime. Build/package tooling must
 update the archive manifest, library receipt and version hash together.
 
 Latest installed source-built experimental APK:
-Mavk/recovery/2026-10-25/DroidDeck-Mavk-source-demo.apk,
-SHA256675e9cb6f83a0a76d7ae199158066f14a294dc9bade4711a5d43cb87331f97b3.
+Mavk/recovery/2026-10-25/DroidDeck-Mavk-fex-boundary-demo.apk,
+SHA2566c8680f51db2db0551675b84f58ae09e4535ffb5326c0fd54535e549aa915b88.
+Built, APK-attested, installed; normal Steam and animated Muck AHB menu pass.
+The portable-FEX child environment now honors DroidDeck's server directory.
+Native DDNet still has a later loader blocker, also reproduced by x86-64 true;
+see [exact boundary and rollback](docs/MAVK_NATIVE_FEX_2026-10-25.md).
+Earlier notices APK443c300b is retained for rollback. Vulkan/WSI payload unchanged.
+Runtime3bd128fb adds exact package notices and file attribution; executable bytes
+are unchanged from the previous source-built runtime. All230 Openbox runtime files
+matched retained package archives; this does not establish complete corresponding
+source for public binary distribution. The previous675e9cb6 source APK is retained.
 Normal Gradle assembleDebug rebuilt Android Kotlin/Java/native/DEX/resources and
 verified every declared runtime input against the APK.70 missing prebuilt runtime
 inputs (100MB) were imported only after matching both a pinned preparation
@@ -63,6 +75,15 @@ APK; this is a Steam-focused developer build, not a complete store/release build
 AMD64 Win32/Wine consumer on that actual APK passed1920→1280→1920 ResizeBuffers,
 S_OK/11_0,exit0,CoreLiveZero,gaps0. No Steam or game prefix was started/changed.
 This is integration evidence, not a gameplay FPS claim.
+
+Live gameplay profiling places the main delay before Android presentation:
+compositor scenes~0.6ms, no CPU copy/pool drops, no eight-core CPU saturation.
+GPU query spans24.9/55.7ms include synchronization and are not shader-only times.
+Mali errors/black tiles occurred during GPU profiling; it is disabled. Diagonal
+artifacts were also reported with the CSE candidate without Mali errors, so the
+artifact root cause is still OPEN. CSE and temporary per-game profiling overrides
+were restored. Thermal Status3 was observed; hot/cold FPS is not a fair A/B.
+Never advertise this APK as a stable60FPS game build or a permanent artifact fix.
 
 Previous rollback APK: Mavk/recovery/2026-10-25/DroidDeck-Mavk-demo2.apk,
 SHA256360c47655ba1acff64eae9ef68d69fb0c4f9c49376fcae21f9ef939103f36fdb.
