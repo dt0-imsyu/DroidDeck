@@ -364,7 +364,11 @@ def system_icd_selected(directory, env):
 
 def placed_memory_requested(command, directory, env):
     setting = env.get(PLACED_MEMORY_SETTING)
-    if setting not in (None, "1") or (setting != "1" and env.get("DROIDDECK_SYSTEM_VULKAN_GPU") != "powervr"):
+    mavk = env.get("DROIDDECK_MAVK_RUNTIME")
+    mavk_pe32 = (env.get("DROIDDECK_SYSTEM_VULKAN_GPU") == "mali" and mavk and
+                 Path(mavk).is_absolute() and
+                 all((Path(mavk) / "pe/i386" / (name + ".dll")).is_file() for name in ("d3d9", "dxgi")))
+    if setting not in (None, "1") or (setting != "1" and env.get("DROIDDECK_SYSTEM_VULKAN_GPU") != "powervr" and not mavk_pe32):
         return False
     if Path(command[2]).name.lower() in ("steam.exe", "steamwebhelper.exe", "iscriptevaluator.exe"):
         return False
@@ -529,6 +533,20 @@ def system_graphics_launch(command, env):
             result["GALLIUM_DRIVER"] = "zink"
             result["MESA_LOADER_DRIVER_OVERRIDE"] = "zink"
         private_wsi = env.get("DROIDDECK_MAVK_XCB_AHB_WSI")
+        selection = env.get("DROIDDECK_MAVK_PRESENTATION", "profile")
+        if selection not in ("profile", "x11-shm", "ahb-bgra"):
+            raise SystemGraphicsError("invalid experimental Mavk presentation: " + selection)
+        if selection == "x11-shm":
+            for key in ("MAVK_WSI_AHB_ALLOC_ONLY", "MAVK_WSI_AHB_PRESENT",
+                        "MAVK_WSI_XCB_AHB_PROXY", "MAVK_WSI_AHB_BGRA_BLIT"):
+                result.pop(key, None)
+            result["WSI_X11_FORCE_SHM"] = "1"
+            if private_wsi:
+                result["VK_LAYER_PATH"] = os.pathsep.join(
+                    path for path in result["VK_LAYER_PATH"].split(os.pathsep) if path != private_wsi)
+            private_wsi = None
+        if selection == "ahb-bgra" and not private_wsi:
+            raise SystemGraphicsError("AHB/BGRA requires an explicit private WSI directory")
         if private_wsi:
             private = Path(private_wsi)
             digest = env.get("DROIDDECK_MAVK_XCB_AHB_SHA256", "")
@@ -538,10 +556,21 @@ def system_graphics_launch(command, env):
                     or not library.is_file() or not (private / "VkLayer_window_system_integration.json").is_file()
                     or hashlib.sha256(library.read_bytes()).hexdigest() != digest or not marker.is_file()):
                 raise SystemGraphicsError("private XCB/AHB WSI requires a pinned library and opted-in compositor")
+            if selection == "ahb-bgra":
+                try:
+                    receipt = json.loads((private / "mavk-ahb.json").read_text())
+                    if (receipt.get("version") != 1 or receipt.get("library_sha256") != digest
+                            or receipt.get("present_modes") != ["fifo"]
+                            or receipt.get("min_images") != 3
+                            or receipt.get("bgra8_gpu_blit") is not True):
+                        raise ValueError("unverified BGRA/three-buffer backend")
+                except (OSError, ValueError, AttributeError) as error:
+                    raise SystemGraphicsError("AHB/BGRA capability receipt unavailable: " + str(error)) from error
+                result["MAVK_WSI_AHB_BGRA_BLIT"] = "1"
             result["VK_LAYER_PATH"] = str(private) + ":" + result["VK_LAYER_PATH"]
             result.update(MAVK_WSI_AHB_ALLOC_ONLY="1", MAVK_WSI_AHB_PRESENT="1", MAVK_WSI_XCB_AHB_PROXY="1")
             result.pop("WSI_X11_FORCE_SHM", None)
-            print("Mavk: experimental XCB/AHB rendering; input routing not yet verified", file=sys.stderr)
+            print("Mavk: experimental fullscreen XCB/AHB; select x11-shm to revert; game compatibility unverified", file=sys.stderr)
     for name in ("DISABLE_WSI_LAYER", "ENABLE_VK_LAYER_VALVE_steam_fossilize_1"):
         result.pop(name, None)
     return command, result

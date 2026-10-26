@@ -58,6 +58,20 @@ class SystemGraphicsLaunchTest(unittest.TestCase):
             self.assertEqual(selected["VK_LAYER_PATH"].split(":")[0], str(private))
             self.assertEqual(selected["MAVK_WSI_XCB_AHB_PROXY"], "1")
             self.assertNotIn("WSI_X11_FORCE_SHM", selected)
+            env["DROIDDECK_MAVK_PRESENTATION"] = "ahb-bgra"
+            with self.assertRaises(MODULE["SystemGraphicsError"]):
+                MODULE["system_graphics_launch"](command, env)
+            (private / "mavk-ahb.json").write_text(json.dumps({
+                "version": 1, "library_sha256": env["DROIDDECK_MAVK_XCB_AHB_SHA256"],
+                "present_modes": ["fifo"], "min_images": 3, "bgra8_gpu_blit": True,
+            }))
+            _, bgra = MODULE["system_graphics_launch"](command, env)
+            self.assertEqual(bgra["MAVK_WSI_AHB_BGRA_BLIT"], "1")
+            _, shm = MODULE["system_graphics_launch"](
+                command, dict(env, DROIDDECK_MAVK_PRESENTATION="x11-shm"))
+            self.assertEqual(shm["WSI_X11_FORCE_SHM"], "1")
+            self.assertNotIn("MAVK_WSI_AHB_BGRA_BLIT", shm)
+            self.assertNotIn(str(private), shm["VK_LAYER_PATH"].split(os.pathsep))
             env["DROIDDECK_MAVK_XCB_AHB_SHA256"] = "0" * 64
             with self.assertRaises(MODULE["SystemGraphicsError"]):
                 MODULE["system_graphics_launch"](command, env)
@@ -439,6 +453,28 @@ class PlacedMemoryLaunchTest(unittest.TestCase):
     layer = "VK_LAYER_DROIDDECK_placed_memory"
     library = "libVkLayer_DROIDDECK_placed_memory.so"
     manifest = "VkLayer_DROIDDECK_placed_memory.json"
+
+    def test_packaged_mavk_pe32_profile_selects_placement_only_for_pe32(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime, _ = self.runtime(root)
+            self.components(runtime)
+            own = root / "mavk"
+            (own / "pe/i386").mkdir(parents=True)
+            for name in ("run-proton.py", "proton_d3d11.py", "pe/libmavk-wine-protection-trace.so",
+                         "pe/i386/d3d9.dll", "pe/i386/dxgi.dll"):
+                (own / name).write_bytes(b"fixture")
+            env = self.environment(runtime, gpu="mali", DROIDDECK_MAVK_RUNTIME=str(own),
+                                   DROIDDECK_MAVK_GUEST_ROOT="/rootfs", DROIDDECK_SYSTEM_VULKAN_DXVK="managed")
+            exe = self.executable(root)
+            _, selected = self.launch(exe, env)
+            self.assertIn(self.layer, selected["VK_INSTANCE_LAYERS"])
+            self.assertEqual(selected[self.setting], "1")
+            _, disabled = self.launch(exe, dict(env, **{self.setting: "0"}))
+            self.assertNotIn(self.layer, disabled["VK_INSTANCE_LAYERS"])
+            exe64 = self.executable(root, machine=0x8664, magic=0x20b, name="64.exe")
+            _, native = self.launch(exe64, env)
+            self.assertNotIn(self.layer, native["VK_INSTANCE_LAYERS"])
 
     def executable(self, root, machine=0x14c, magic=0x10b, name="game.exe"):
         # One PE section and the full standard PE32 optional-header footprint.

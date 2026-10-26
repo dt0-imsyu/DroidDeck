@@ -474,6 +474,31 @@ class LaunchTest(FexTestCase):
 class AppInfoTest(unittest.TestCase):
     COMPAT = runpy.run_path(str(BIN / "steam-compatibility"))
 
+    def test_mavk_windows_profile_avoids_native_x86_default_but_keeps_explicit_tools(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            steam = Path(tmp)
+            (steam / "appcache").mkdir()
+            (steam / "appcache/appinfo.vdf").write_bytes(self.appinfo({
+                30: ("windows,linux", "64", "game"),
+                40: ("linux", "64", "game"),
+                41: ("windows,linux", "aarch64", "game"),
+            }))
+            with mock.patch.dict(os.environ, {"DROIDDECK_MAVK_DIRECT": "1"}):
+                targets = self.COMPAT["native_targets"](str(steam), ["30", "40", "41"])
+            self.assertIs(targets["30"], self.COMPAT["WINDOWS_DEFAULT"])
+            self.assertEqual(targets["40"], "droiddeck-fex")
+            self.assertIsNone(targets["41"])
+            plan = self.COMPAT["plan_mapping"]
+            default = self.COMPAT["TOOL"]
+            changes, kept = plan({"0": default, "30": ""}, ["30"], [default], default,
+                                 {}, targets, native_choices=["30"])
+            self.assertEqual(changes, {"30": default})
+            self.assertEqual(kept["30"], default)
+            for explicit in ("droiddeck-fex", "steamlinuxruntime", "custom-proton"):
+                changes, _ = plan({"0": default, "30": explicit}, ["30"],
+                                  [default, explicit], default, {}, targets)
+                self.assertEqual(changes, {})
+
     @staticmethod
     def appinfo(apps, magic=0x07564429):
         strings = []

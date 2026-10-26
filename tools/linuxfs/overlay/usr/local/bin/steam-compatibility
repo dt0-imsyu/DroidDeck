@@ -802,7 +802,9 @@ def native_targets(steam_root, apps):
             targets[app] = None
             continue
         if "windows" in oslist:
-            targets[app] = NATIVE_CHOICE
+            # The opted-in Mavk profile implements Windows graphics, not the
+            # separate native x86 Linux/FEX runtime. Keep explicit tool choices.
+            targets[app] = WINDOWS_DEFAULT if os.environ.get("DROIDDECK_MAVK_DIRECT") == "1" else NATIVE_CHOICE
             continue
         targets[app] = FEX_TOOL
     return targets
@@ -886,6 +888,7 @@ def app_order(app):
 
 DEFERRED_GAME_TOOL = object()
 NATIVE_CHOICE = object()
+WINDOWS_DEFAULT = object()
 
 
 def plan_mapping(current, installed, runnable, default, auto, native=None, picks=(), overrides=None, managed=None,
@@ -914,7 +917,10 @@ def plan_mapping(current, installed, runnable, default, auto, native=None, picks
             continue
         mine = auto.get(app)
         target = native.get(app, default)
-        if not name and app in native_choices:
+        windows_profile = target is WINDOWS_DEFAULT
+        if windows_profile:
+            target = default
+        if not name and app in native_choices and not windows_profile:
             target = NATIVE_CHOICE
         stale = unrunnable(name, runnable)
         if name and not stale and (mine is None or name != mine):
