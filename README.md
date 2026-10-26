@@ -36,6 +36,8 @@ For presentation problems, disable the AHB toggle and restart to use X11/SHM.
 compatibility-tool choices are respected: remove an old native/unrelated override
 if you want the automatic Windows/Proton profile for a dual-platform title.
 
+[Gameplay video](https://drive.google.com/drive/folders/14fmiUE_v605aGOI5DPf705XoJdSCv_rI?usp=sharing).
+
 ## What actually works
 
 | Scenario | Evidence on Tab S11 / Mali-G925 |

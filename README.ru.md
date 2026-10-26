@@ -36,6 +36,8 @@ stock Android 16 на Tab S11; эти проверки не доказывают
 compatibility tool сохраняется: убери старое принудительное native/другое
 переопределение, если нужен автоматический Windows/Proton для dual-platform игры.
 
+[Видео геймплея](https://drive.google.com/drive/folders/14fmiUE_v605aGOI5DPf705XoJdSCv_rI?usp=sharing).
+
 ## Что действительно работает
 
 | Сценарий | Доказательство на Tab S11 / Mali-G925 |

@@ -40,7 +40,8 @@ promise of a reply. No message has been sent on the owner's behalf.
 * Clearly list remaining artifact/performance/compatibility limitations. Preserve
   upstream licenses and distinguish this fork from an official release.
 * The unsent editable draft is [UPSTREAM_MESSAGE.md](UPSTREAM_MESSAGE.md).
-  Gameplay video is pending the owner's Google Drive link.
+  The owner's gameplay folder is
+  https://drive.google.com/drive/folders/14fmiUE_v605aGOI5DPf705XoJdSCv_rI?usp=sharing.
 
 ## Primary sources / Первичные источники
 

@@ -1,7 +1,7 @@
 # Draft for the DroidDeck team
 
-Unsent draft. Repository/APK links are live; add the owner's Google Drive video link before
-sending.
+Unsent editable draft. The fork/APK and owner-supplied gameplay links are filled
+in. Mavk is still private until the owner opens it or grants access.
 The owner rechecked Steam and both games through normal Play. This remains an
 experimental review build. This file does not send the message.
 
@@ -35,7 +35,7 @@ collaboration, feedback or help sharing the work.
 - DroidDeck fork: https://github.com/dt0-imsyu/DroidDeck
 - Mavk: https://github.com/dt0-imsyu/Mavk (currently private)
 - Test APK: https://github.com/dt0-imsyu/DroidDeck/releases/download/mavk-demo-20261026/DroidDeck-Mavk-demo.apk
-- Gameplay video (Google Drive): [link to be added]
+- Gameplay video (Google Drive): https://drive.google.com/drive/folders/14fmiUE_v605aGOI5DPf705XoJdSCv_rI?usp=sharing
 
 Architecture, build inputs, reproduction steps and known limitations are in
 README.MAVK.md and docs/MAVK_DEVELOPER_REVIEW.md. The short install-and-play
@@ -55,5 +55,4 @@ of the reusable AHB/fence/compositor changes and any help developing this furthe
 
 Fork/APK: https://github.com/dt0-imsyu/DroidDeck/releases
 Mavk: https://github.com/dt0-imsyu/Mavk (access pending the owner's publication)
-Gameplay: [Google Drive link to be added]
-Full technical post: [Show and tell discussion link to be added]
+Gameplay: https://drive.google.com/drive/folders/14fmiUE_v605aGOI5DPf705XoJdSCv_rI?usp=sharing
