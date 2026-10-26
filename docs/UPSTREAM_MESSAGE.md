@@ -1,7 +1,7 @@
 # Draft for the DroidDeck team
 
-Unsent draft. Repository/APK links target the authorized publication; verify
-they are live and add the owner's Google Drive video link before sending.
+Unsent draft. Repository/APK links are live; add the owner's Google Drive video link before
+sending.
 The owner rechecked Steam and both games through normal Play. This remains an
 experimental review build. This file does not send the message.
 

@@ -87,7 +87,11 @@ Steam prefixes, account data, signing secrets or unsanitized device logs.
 
 ## Publication status
 
-Local source/APK preparation only: no push or publication. The new API runtime is
+The owner verified Steam/HL2/Muck and authorized the public experimental fork
+and test prerelease on2026-10-26. Download the APK from
+https://github.com/dt0-imsyu/DroidDeck/releases/tag/mavk-demo-20261026.
+Mavk source was pushed separately and remains private at the owner's request.
+The packaged API runtime is
 `8213c6709ef42a73cbd32c1e48aadad49788800a8552fe83f802fa6472ba08cb`.
 A normal Gradle experimental APK builds from a clean checkout with pinned
 prebuilt dependencies and was installed/tested. See

@@ -17,6 +17,8 @@ permissions:
 
 jobs:
   kwin:
+    # Optional upstream component; forks can request an artifact build manually.
+    if: github.repository == 'Droid-Deck/DroidDeck' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
     steps:
@@ -42,14 +44,14 @@ jobs:
           path: out/kwin
       - uses: actions/create-github-app-token@v2
         id: components-token
-        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        if: github.repository == 'Droid-Deck/DroidDeck' && github.event_name == 'workflow_dispatch' && inputs.tag != ''
         with:
           app-id: ${{ vars.DROIDDECK_CI_APP_ID }}
           private-key: ${{ secrets.DROIDDECK_CI_APP_KEY }}
           owner: Droid-Deck
           repositories: DroidDeck-Components
       - name: Refuse a published tag
-        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        if: github.repository == 'Droid-Deck/DroidDeck' && github.event_name == 'workflow_dispatch' && inputs.tag != ''
         env:
           GH_TOKEN: ${{ steps.components-token.outputs.token }}
         run: |
@@ -75,7 +77,7 @@ jobs:
             out/desktop-kde.kwin.txt
             out/desktop-kde.sha256
       - name: Publish
-        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        if: github.repository == 'Droid-Deck/DroidDeck' && github.event_name == 'workflow_dispatch' && inputs.tag != ''
         env:
           GH_TOKEN: ${{ steps.components-token.outputs.token }}
           GH_REPO: Droid-Deck/DroidDeck-Components

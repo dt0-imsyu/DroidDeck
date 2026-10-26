@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   catalog:
+    # This writes the upstream organization's catalog and needs its GitHub App.
+    if: github.repository == 'Droid-Deck/DroidDeck'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
