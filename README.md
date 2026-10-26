@@ -1,42 +1,114 @@
-Experimental Mavk fork: [architecture, measured results and limitations](README.MAVK.md).
+# DroidDeck + Mavk — experimental Mali fork
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="artwork/droiddeck-banner-dark.svg">
-    <img alt="DroidDeck" src="artwork/droiddeck-banner-light.svg" width="100%">
-  </picture>
-</p>
+**Steam and Windows games on a stock Galaxy Tab S11 / Mali-G925, with an
+experimental Vulkan compatibility backend and AHardwareBuffer presentation.**
 
-DroidDeck brings the SteamOS experience to Android: Valve's Steam client in Big Picture on your Android handheld, with Windows games through Valve's ARM64 Proton.
+[Русский](README.ru.md) · [Download test APK](https://github.com/dt0-imsyu/DroidDeck/releases) · [Install and play](docs/TRY_TEST_APK.md) · [Developer review](docs/MAVK_DEVELOPER_REVIEW.md) · [Upstream DroidDeck](https://github.com/Droid-Deck/DroidDeck)
 
-<p align="center"><a href="https://discord.gg/JRGAvawjsm"><img src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join the DroidDeck Discord"></a></p>
+This is an independent experimental fork by **dt0-imsyu**, not an official
+DroidDeck release. It retains DroidDeck's interface, Steam, ARM64 Proton/Wine/FEX
+and original supported Adreno/Turnip path. No root, bootloader unlock, firmware
+change or SELinux modification is required. The primary tested target is stock
+Android 16 on Tab S11; support for other GPUs is not established by these tests.
 
-<p align="center"><img src="docs/releases/media/0.2.0/launch-into-steam.gif" width="80%" alt="Tapping DroidDeck on the Android home screen and landing in Steam Big Picture"></p>
+## Install and try — no per-game commands
 
-> Note: DroidDeck does not have a stand-alone website. Do not click on any download links from websites claiming to be the DroidDeck team. 
+1. Download **DroidDeck-Mavk-demo.apk** from this fork's **Releases** and install
+   it through Android. The `.mavk` package is separate from the stock app.
+2. Complete DroidDeck's normal Linux/runtime installation. Steam downloads on
+   first start. On Android 14+, enable **Disable child process restrictions**
+   in Developer options, as required by upstream DroidDeck.
+3. Before starting a session, open Launcher settings → Device and enable
+   **Mavk / Mali — experimental** and **Mavk AHB display (experimental)**.
+   **Hardware Steam interface** is optional. Restart DroidDeck if requested.
+4. Choose **1920×1080** before launching Steam; keep HDR off for this fullscreen
+   SDR path. Sign in with your own Steam account and install a game you own.
+5. Use the ordinary **Play** button in Steam or DroidDeck. The APK includes Mavk,
+   the tested Sarek payload and launch policy. No manual library copying, source
+   build, terminal or per-game shell command is needed for the tested route.
 
-## Requirements and install
+Use low graphics with medium object/texture detail for the HL2 demonstration.
+Avoid changing resolution inside HL2; stop the session before selecting another
+mode. The initial chapter can have a black transition before the scene appears.
+For presentation problems, disable the AHB toggle and restart to use X11/SHM.
 
-Use Android 9 or newer. Supported Adreno devices include 730 or newer, or 8xx. Adreno 6xx is experimental: DirectX 11 uses DXVK 2 and may run, and DirectX 12 games can still crash. PowerVR, Xclipse, and Mali support is experimental: where the system Vulkan backend is available, the app selects it automatically for the display and runtime. Compatibility varies by device. Mali uses the experimental system Vulkan bridge and its guarded DXVK profile. On a Pixel 8 Pro with Mali-G715 driver 54.3.0, Portal and a brief Old School Rally scene rendered; other drivers, games, and sustained performance remain unvalidated. Adreno 710 is unsupported. No root is required. Allow about 3 GB for the runtime and 1.1 GB more for the desktop and emulators. Install the APK from [Releases](https://github.com/Droid-Deck/DroidDeck/releases), install the Linux runtime, then press **Play** and sign in. Steam downloads on first launch. Install **Desktop & apps** to use the desktop and emulators. The **Store** installs Linux apps and games from Flathub (ARM64 builds) with Flatpak; with additional options to install Appimages and set up scripts. **Stores** (Setup › Stores › "Show Stores in the rail") signs in to GOG, Epic Games and Amazon Games, browses their catalogs and libraries, downloads games into the Games storage and adds each one to the Steam client as a non-Steam game, so it launches through Proton like everything else; the cog on its chip row sets which tab a store opens on and the download speed tier.
+[Detailed quick start and fallback](docs/TRY_TEST_APK.md). Explicit Steam
+compatibility-tool choices are respected: remove an old native/unrelated override
+if you want the automatic Windows/Proton profile for a dual-platform title.
 
-On Android 14 and newer, before Steam launches, you must turn on **Disable child process restrictions** in Developer options. If this option is not available in developer settings (Android 12 and 13 devices), first launch of Steam will present a "Fix it for me" button, which will help automate the setup process.
+## What actually works
 
-## Community
+| Scenario | Evidence on Tab S11 / Mali-G925 |
+| --- | --- |
+| HL2, Full HD, low graphics + medium objects/textures | Owner reports 30+ FPS, stable 60 in some areas |
+| HL2, nearly maximum graphics | Owner reports usually 20–30 FPS; scene-dependent |
+| Muck | Playable rendering; roughly 12–13 displayed buffers/s in one heavy scene, 9.1 in another |
+| Muck moving menu | Around 34–35 displayed buffers/s, AHB with no CPU framebuffer copies |
+| Standard packaged launches | HL2 menu/first train scene and Muck menu verified; owner also rechecked both Play buttons |
+| AHB / SHM | AHB game-buffer/copy counters verified; moving D3D11 SHM fallback and game loading image tested |
+| Resize/input | Focused D3D11 ResizeBuffers test passed; absolute pointer scaling corrected |
 
-Join the [DroidDeck Discord](https://discord.gg/JRGAvawjsm) for help, Preview builds, and device reports. Bug reports go in its **#bug-reports** forum; attach the zip from **Share logs** (Setup, or the session drawer) so the logs come with it.
+The HL2 gameplay figures are owner observations, not a controlled benchmark or
+locked 60 FPS everywhere. Present calls, Android displayed buffers and unique
+rendered gameplay frames are different metrics. FPS varies with scene/settings
+and thermal state; menu/loading rates are not gameplay scores.
 
-## Build
+Known limitations: low Muck world FPS; occasional black/diagonal artifacts;
+rare HL2 character/audio hitches; unreliable in-game HL2 resolution changes;
+some live D3D9 descriptor aliases; PE32 D3D11 not implemented; native Linux/FEX
+startup blockers such as DDNet. Full upstream DXVK/Vulkan conformance and
+Adreno/other-Mali AHB portability are not claimed. This Steam-focused build
+omits optional Rust store download engines.
 
-Run `tools/build_local.sh` with Docker, Java 17, the Android SDK/NDK, Rust through rustup, GitHub CLI, Python 3, and `zstd` installed. It prepares the same native libraries, pinned components and audio sinks as CI, then checks the APK's assets, JNI exports and dependencies. The APK is at `app/build/outputs/apk/release/app-release.apk`. Set `DROIDDECK_PA13_SOURCE_DIR` to an existing PulseAudio 13.0 source directory to skip downloading it. Set `DROIDDECK_SIGNING_ENV` to a signing environment file to install over a release build; relative keystore paths resolve beside that file. To install on an attached device, run `tools/deploy_local.sh`.
+## Architecture and what can be reused
 
-After preparation, ordinary `./gradlew :app:assembleRelease` builds can reuse the verified inputs. If native sources, component pins or staged files change, packaging stops with instructions to rerun the helper. Generated audio stays under `app/build/`; the tracked base bundle is never modified. `./gradlew -PskipRust=true :app:testDebugUnitTest` needs no native preparation. For an APK without store engines, use `DROIDDECK_SKIP_RUST=1 tools/build_local.sh`; it omits cached engine libraries too.
+`Steam → ARM64 Proton/Wine/FEX → experimental DXVK-Sarek → Mavk → libhybris → stock Android Vulkan/Mali`
 
-Run the helper and preload regression suite with `bash tools/test_local.sh`. On macOS it runs in Linux through Docker, matching the helpers' runtime and CI instead of compiling Linux preloads against macOS headers.
+XCB/Wayland WSI imports Android hardware buffers and uses explicit acquire/release
+fences. Native RGBA can reach its Android layer without CPU framebuffer copies;
+BGRA requires a GPU conversion blit. SHM remains a functional fallback. This
+presentation work can be reviewed separately from Mavk shader compatibility and
+may benefit other GPUs, but that portability still needs hardware testing.
 
-## Limits
+* This repository: launcher/session lifecycle, Android compositor, input, normal
+  game-launch policy and optional backend selection.
+* [Mavk](https://github.com/dt0-imsyu/Mavk): reusable Core/Compatibility, Vulkan
+  adapter and WSI source. Its owner controls access; the repository may remain
+  private until separately opened.
+* [Review guide](docs/MAVK_DEVELOPER_REVIEW.md): source entry points, buffer/fence
+  ownership, reproduction and limitations.
 
-Compatibility and performance vary by device; hardware validation is limited. Desktop compositing uses software rendering. Firefox sandboxing is reduced under proot. Logs are kept app-private (`files/logs/`, the last 30 sessions); **Share logs** packs the newest session, with the stores and tool logs, into one scrubbed zip.
+The original Adreno driver/DXVK route remains selectable. Sarek is an experimental
+Mali consumer, not a mandatory replacement for all devices. Mavk does not itself
+provide WDDM or hardware-accelerated Windows DWM in U-AVF.
 
-## Credits and licence
+## Source builds and debugging
 
-GPL-3.0. Runtime, shim, input, and controller work build on WinNative and Bannerlator (maxjivi05). Epic Games and GOG support build on [Phobos’s](https://github.com/phobos665) adaptation of [Legendary](https://github.com/legendary-gl/legendary) and [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl), respectively. LSFG frame generation is from the work of Camille LaVey and the [Eden](https://eden-emu.dev) emulator project, following [lsfg-vk](https://github.com/PancakeTAS/lsfg-vk), ported to WinNative and DroidDeck by [@maxjivi05](https://github.com/maxjivi05); it needs your own copy of [Lossless Scaling](https://store.steampowered.com/app/993090/) and ships none of its shaders. x86 AppImages, and any whose own runtime cannot unpack them, are unpacked with [uruntime](https://github.com/VHSgunzo/uruntime) by VHSgunzo (MIT), shipped unmodified with its licence. See [LICENSE](LICENSE). Steam and Proton belong to Valve Corporation; this project is not affiliated with Valve.
+**To try games, use the APK.** Source builders can follow [README.MAVK.md](README.MAVK.md)
+and [the pinned-input build guide](docs/PINNED_REVIEW_BUILD.md). A normal Gradle
+app/native compositor build was checked from a clean checkout with checksum-verified
+external dependencies. That is not an all-third-party-dependencies source rebuild.
+Full upstream preparation is `tools/build_local.sh` and requires its documented
+Docker/JDK/Android SDK/NDK/Rust/Python/zstd toolchain. Optional stores can be omitted.
+
+For bug reports use **Share logs** from Setup/session drawer. Include device/GPU,
+APK version, game, resolution/settings and AHB/SHM selection, with a short moving
+scene. Remove personal/account data. [Build checkpoint](docs/BUILD_CHECKPOINT_2026-10-26.md)
+records the focused passing tests and the non-green broad Windows-host JVM suite;
+do not interpret a packaged-game PASS as validation of every upstream feature.
+
+## Credits and licenses
+
+DroidDeck remains **GPLv3**; see [LICENSE](LICENSE). Original runtime, input and
+controller work builds on DroidDeck, WinNative and Bannerlator/maxjivi05. Store
+integration also credits the upstream Legendary/gogdl projects and their authors;
+Steam/Proton belong to Valve. This fork is not affiliated with Valve or an
+endorsed upstream release.
+
+Original Mavk work is by dt0-imsyu and contributors under Apache 2.0, except marked
+third-party/derived components. The WSI fork is MIT; the derived Proton wrapper
+remains GPLv3. Sarek, Mesa, libhybris, Openbox and compiler dependencies retain
+their original terms/notices. Source-coverage limitations remain documented;
+calling the APK experimental does not change those licenses.
+
+[Official upstream community](https://discord.gg/JRGAvawjsm) · [Prepared review message and contact routes](docs/DROIDDECK_CONTACTS.md)
