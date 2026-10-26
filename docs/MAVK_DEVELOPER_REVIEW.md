@@ -42,6 +42,9 @@ thermal state. Startup/loading/menu results must not be labelled gameplay FPS.
 
 ## Reproduction through the ordinary UI
 
+For APK-only evaluation, follow [TRY_TEST_APK.md](TRY_TEST_APK.md); the build
+and dependency-seed instructions are for source reviewers, not installation.
+
 1. Install the `.mavk` experimental APK; keep the stock app separately.
 2. Install/start the normal Linux runtime and Steam using DroidDeck's UI.
 3. Select the experimental Mavk backend and optional Mavk AHB presentation in
@@ -69,11 +72,14 @@ show Steam login details, account pages or personal notifications in public clip
 
 HL2 is the preferred demonstration, with Muck as a fallback. At Full HD the user
 reported 10–30 FPS near maximum graphics (usually 20–30), and mostly 30–50 FPS
-on low settings. These are user gameplay observations, not a controlled
+on low settings. The latest report specifies low settings with medium objects
+and textures: 30+ FPS, with stable 60 FPS in some areas. These are user gameplay
+observations, not a controlled
 benchmark. Rare character pauses with repeating audio remain unlocalized.
 Full HD was independently confirmed from D3D9/Vulkan swapchain parameters.
 In-game resolution changes can crash HL2 and leave Steam unresponsive; restart
-with the target mode already selected. Neither game demonstrates stable 60 FPS.
+with the target mode already selected. Locked 60 FPS throughout gameplay has
+not been established.
 
 ## Known gaps to review
 

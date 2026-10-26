@@ -6,6 +6,8 @@ AHardwareBuffer presentation. Tested target: stock Galaxy Tab S11 / Mali-G925,
 Android16, without root or system modifications.
 
 **Reviewer guide:** [components, reproduction and recording](docs/MAVK_DEVELOPER_REVIEW.md).
+**Try the APK:** [install and play through the UI](docs/TRY_TEST_APK.md) — no
+per-game commands or separate Mavk library installation.
 Mavk Core/Compatibility and the MIT WSI fork live in the separate Mavk repository;
 Android session/compositor integration belongs here. Original licenses remain intact.
 
@@ -15,6 +17,7 @@ Android session/compositor integration belongs here. Original licenses remain in
 | --- | --- |
 | HL2,1920×1080, nearly maximum settings | User-reported10–30FPS, usually20–30; actual gameplay |
 | HL2,1920×1080, low settings | User-reported30–50FPS, mostly stable and playable |
+| HL2,1920×1080, low settings with medium objects/textures | Latest user report:30+FPS, stable60 in some areas; scene-dependent |
 | HL2 rare hitches | Characters sometimes pause with repeated sound; cause not localized |
 | Muck moving menu | About34–35 displayed game buffers/s, AHB/copy0 |
 | Muck heavy gameplay | About12–13 in one scene;9.1 in another view at1600p and1200p |
