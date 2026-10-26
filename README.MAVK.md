@@ -49,9 +49,11 @@ applications, avoiding the separate broken native Linux/FEX default. Explicit
 compatibility-tool choices and native ARM64 applications remain respected.
 PE32 D3D11 is not implemented. Standard Adreno/DXVK selections are not replaced.
 
-The new packaged ordinary-button path still needs its final on-device check.
-The current recording session uses separately staged development components;
-no APK is installed or session interrupted while that recording is in progress.
+The packaged route was checked on the device after recording: standard Steam
+launch requests started HL2 (Full HD menu/first train scene) and Muck (moving
+menu) using the packaged runtime, without private PE/layer paths. The diagnostic
+focus observer does not recognize these private-Xwayland windows; that timeout
+is not a game-launch failure. See the build checkpoint below.
 
 ## Build and reproducibility
 
@@ -84,8 +86,10 @@ Steam prefixes, account data, signing secrets or unsanitized device logs.
 
 Local source/APK preparation only: no push or publication. The new API runtime is
 `8213c6709ef42a73cbd32c1e48aadad49788800a8552fe83f802fa6472ba08cb`.
-A normal Gradle experimental APK builds successfully; clean-checkout reproduction
-and final ordinary-button device regression are still being completed.
+A normal Gradle experimental APK builds from a clean checkout with pinned
+prebuilt dependencies and was installed/tested. See
+[build checkpoint](docs/BUILD_CHECKPOINT_2026-10-26.md) for hashes, device
+observations and the non-green broad Windows-host test suite.
 
 DroidDeck is GPLv3. Mavk’s own code is Apache2 except marked derivatives; WSI is
 MIT and the derived Proton wrapper remains GPLv3. Sarek, Mesa/Zink, libhybris,

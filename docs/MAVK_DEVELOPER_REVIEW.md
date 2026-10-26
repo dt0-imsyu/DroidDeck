@@ -54,7 +54,8 @@ thermal state. Startup/loading/menu results must not be labelled gameplay FPS.
 6. To roll back presentation, select X11/SHM and restart the session. To compare
    Adreno, retain the original supported driver/DXVK selection instead of Mavk.
 
-The new ordinary-button path still requires its final APK device regression.
+The clean APK standard Steam launch route was checked for both games; see
+BUILD_CHECKPOINT_2026-10-26.md for the exact scope and remaining gaps.
 Do not use the developer's private `files/mavk-*-test` directories as dependencies
 for someone else's installation. They are development artifacts, not the runtime.
 
