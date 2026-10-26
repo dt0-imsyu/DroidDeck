@@ -12,6 +12,8 @@ verified with this backend; the original supported graphics paths remain.
 2. Follow DroidDeck's normal first-run Linux/runtime and Steam download flow.
    Wait for installation to finish; no separate Mavk ZIP or library copying is
    needed. Mavk, the compatibility layers and experimental Sarek are in the APK.
+   On Android 14+, enable **Disable child process restrictions** in Android
+   Developer options, as required by the normal upstream DroidDeck runtime.
 3. Before starting a session, open Launcher settings → Device and enable
    **Mavk / Mali — experimental** and **Mavk AHB display (experimental)**.
    **Hardware Steam interface** is optional. Restart DroidDeck if requested
