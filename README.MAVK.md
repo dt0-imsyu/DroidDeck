@@ -1,122 +1,95 @@
 # DroidDeck + Mavk — experimental developer prototype
 
-This is a fork of DroidDeck, not a replacement Steam client or a Mali kernel
-driver. The original README/LICENSE remain intact. Primary target: stock
-Galaxy Tab S11 / Mali-G925, without root or system modifications.
+This fork keeps DroidDeck’s normal Android UI, Steam, ARM64 Proton/Wine/FEX and
+Adreno/Turnip support. It adds an optional Mali Vulkan compatibility backend and
+AHardwareBuffer presentation. Tested target: stock Galaxy Tab S11 / Mali-G925,
+Android16, without root or system modifications.
 
-## Architecture
+**Reviewer guide:** [components, reproduction and recording](docs/MAVK_DEVELOPER_REVIEW.md).
+Mavk Core/Compatibility and the MIT WSI fork live in the separate Mavk repository;
+Android session/compositor integration belongs here. Original licenses remain intact.
 
-Existing Steam → ARM64 Proton/Wine/FEX → experimental DXVK-Sarek → Mavk
-compatibility layer → libhybris → stock Android Vulkan/Mali.
+## Actual results and limitations
 
-Presentation: optional XCB-to-Wayland fullscreen proxy → AHardwareBuffer with
-explicit acquire/release fences → existing DroidDeck SurfaceControl layer.
-Native RGBA is direct; BGRA requires one GPU conversion blit, not CPU readback.
-The source for the WSI bridge and reusable Android interfaces is maintained in
-the separate Mavk repository. Android lifecycle/selection belongs to this fork.
+| Scenario | Evidence |
+| --- | --- |
+| HL2,1920×1080, nearly maximum settings | User-reported10–30FPS, usually20–30; actual gameplay |
+| HL2,1920×1080, low settings | User-reported30–50FPS, mostly stable and playable |
+| HL2 rare hitches | Characters sometimes pause with repeated sound; cause not localized |
+| Muck moving menu | About34–35 displayed game buffers/s, AHB/copy0 |
+| Muck heavy gameplay | About12–13 in one scene;9.1 in another view at1600p and1200p |
+| Final same-scene Muck shader A/B |12.5 /12.7 /12.3 displayed buffers/s; no material gain |
+| ARM64/AMD64 D3D11 consumer | Rendered;1920→1280→1920 ResizeBuffers and CoreZero checks passed |
+| SHM fallback | Actual moving D3D11 stream,598 copied buffers/10s |
+| DDNet native Linux/FEX | Loader failure before Vulkan; no gameplay PASS |
+| Adreno / other Mali | Original paths retained; Mavk/AHB portability not hardware-proven |
 
-The normal Adreno/Turnip and standard DXVK selections remain available. AHB is
-off by default; use Settings → Launcher → Mavk experimental AHB, then restart
-the session. SHM remains the explicit rollback. No device-wide library override.
-Adreno AHB portability is not yet hardware-tested.
+HL2 FPS above is the user’s gameplay observation, not an independent captured
+benchmark. Android displayed buffers, Present calls and unique gameplay frames
+are different metrics. The device/game resolution was independently confirmed
+as1920×1080 from D3D9 and Vulkan swapchain parameters.
 
-## Actual evidence
+In-game resolution changes can crash HL2 and leave Steam unresponsive. Choose
+the desired display mode before session start. Occasional diagonal black artifacts
+were reported in earlier tests; a universal fix is not established. GPU-query/CSE
+experiments are disabled. No stable60FPS or complete Vulkan CTS/upstream DXVK
+compatibility claim is made. Sarek’s diagnostic feature admission is experimental.
 
-| Scenario | Result |
-|---|---|
-| Muck moving menu,1920×1200 | AHB direct layer,29.65 displayed buffers/s over20.27s |
-| Same menu,2560×1600 | AHB direct layer,29.94 displayed buffers/s over20.24s |
-| Later1200p run |349 GPU=349zero-copy=349on-screen buffers/10s |
-| ARM64/AMD64 Wine D3D11 consumer | Rendered; standard ResizeBuffers passed |
-| Scaled pointer candidate | Native D3D11 received button/key; X server coordinates checked |
-| Current Muck animated menu | ~34–35 displayed buffers/s, actual AHB, copy0 |
-| Same heavy Muck view,1600p→1200p |9.1→9.1 displayed buffers/s; not a resolution-only bottleneck |
-| Half-Life2 / heavier gameplay | HL2 not installed in the sole current library; no large download started |
-| DDNet Linux/FEX | Startup fails before Vulkan; no current gameplay PASS |
+## Architecture and ordinary game launch
 
-Steam/game use is authorized now. These are not60unique gameFPS, a complete benchmark, or proof of gaming parity
-with native Android/Turnip. No specific30FPS root cause is established yet.
-The same-menu resolution comparison does not support a fill-rate-only diagnosis.
-Existing diagnostic Sarek feature admissions are experimental, not Vulkan CTS
-conformance or complete upstream DXVK compatibility.
+Steam → ARM64 Proton/Wine/FEX → experimental DXVK-Sarek → Mavk Compatibility →
+libhybris → stock Android Vulkan/Mali. Native RGBA AHB presentation avoids CPU
+framebuffer copies; BGRA needs one GPU conversion blit. Acquire/release fences
+manage ownership. X11/SHM remains the rollback.
 
-## Build / installation status
+Select Mavk and optional Mavk AHB once in Launcher settings, then start Steam
+and use its ordinary Play buttons. The new package contains ARM64X D3D11 and
+PE32 D3D9/DXGI. The opted-in profile prefers Windows/Proton for x86 dual-platform
+applications, avoiding the separate broken native Linux/FEX default. Explicit
+compatibility-tool choices and native ARM64 applications remain respected.
+PE32 D3D11 is not implemented. Standard Adreno/DXVK selections are not replaced.
 
-Use the standard DroidDeck Gradle build with `-PmavkExperimental=true`; the
-experimental package suffix is `.mavk`, preserving the stock app. The Android
-SDK/NDK and normal DroidDeck runtime build prerequisites are still required.
-Mavk runtime archives are content-addressed and manifest-checked at installation.
-The current local runtime/version assets are build inputs, not source releases.
+The new packaged ordinary-button path still needs its final on-device check.
+The current recording session uses separately staged development components;
+no APK is installed or session interrupted while that recording is in progress.
 
-The independent Mavk bridge source is under `third_party/wsi-layer` with pinned
-provenance; Android-neutral helpers are under `adapters/android`. Do not copy
-unversioned libraries into an installed runtime. Build/package tooling must
-update the archive manifest, library receipt and version hash together.
+## Build and reproducibility
 
-Latest installed source-built experimental APK:
-Mavk/recovery/2026-10-25/DroidDeck-Mavk-fex-boundary-demo.apk,
-SHA2566c8680f51db2db0551675b84f58ae09e4535ffb5326c0fd54535e549aa915b88.
-Built, APK-attested, installed; normal Steam and animated Muck AHB menu pass.
-The portable-FEX child environment now honors DroidDeck's server directory.
-Native DDNet still has a later loader blocker, also reproduced by x86-64 true;
-see [exact boundary and rollback](docs/MAVK_NATIVE_FEX_2026-10-25.md).
-Earlier notices APK443c300b is retained for rollback. Vulkan/WSI payload unchanged.
-Runtime3bd128fb adds exact package notices and file attribution; executable bytes
-are unchanged from the previous source-built runtime. All230 Openbox runtime files
-matched retained package archives; this does not establish complete corresponding
-source for public binary distribution. The previous675e9cb6 source APK is retained.
-Normal Gradle assembleDebug rebuilt Android Kotlin/Java/native/DEX/resources and
-verified every declared runtime input against the APK.70 missing prebuilt runtime
-inputs (100MB) were imported only after matching both a pinned preparation
-manifest and preserved APK. It is NOT a rebuild of all third-party dependencies.
-Optional Rust store downloader remains skipped, as absent in the previous working
-APK; this is a Steam-focused developer build, not a complete store/release build.
+Standard full upstream runtime preparation is `tools/build_local.sh` and needs
+its documented Docker/cross-compilation dependencies. External components retain
+pinned versions. A faster developer build may reuse checksum-verified prepared
+runtime inputs; that is **not** rebuilding every third-party dependency from source.
 
-AMD64 Win32/Wine consumer on that actual APK passed1920→1280→1920 ResizeBuffers,
-S_OK/11_0,exit0,CoreLiveZero,gaps0. No Steam or game prefix was started/changed.
-This is integration evidence, not a gameplay FPS claim.
+The tested Windows app build uses JDK17+, Android SDK36/build-tools36.0.0,
+NDK28.2.13676358 and Linux/WSL for runtime verification:
 
-Live gameplay profiling places the main delay before Android presentation:
-compositor scenes~0.6ms, no CPU copy/pool drops, no eight-core CPU saturation.
-GPU query spans24.9/55.7ms include synchronization and are not shader-only times.
-Mali errors/black tiles occurred during GPU profiling; it is disabled. Diagonal
-artifacts were also reported with the CSE candidate without Mali errors, so the
-artifact root cause is still OPEN. CSE and temporary per-game profiling overrides
-were restored. Thermal Status3 was observed; hot/cold FPS is not a fair A/B.
-Never advertise this APK as a stable60FPS game build or a permanent artifact fix.
+```sh
+./gradlew :app:stageSessionScripts -PmavkExperimental=true -PmavkCompileSdk=36 -PmavkBuildTools=36.0.0 -PndkVersion=28.2.13676358 -PskipRust=true
+python3 tools/release/runtime_inputs.py record
+./gradlew :app:assembleDebug -PmavkExperimental=true -PmavkCompileSdk=36 -PmavkBuildTools=36.0.0 -PndkVersion=28.2.13676358 -PskipRust=true
+python3 tools/release/runtime_inputs.py apk app/build/outputs/apk/debug/app-debug.apk
+```
 
-Previous rollback APK: Mavk/recovery/2026-10-25/DroidDeck-Mavk-demo2.apk,
-SHA256360c47655ba1acff64eae9ef68d69fb0c4f9c49376fcae21f9ef939103f36fdb.
-It is an asset/native rollup of the preserved known-good APK, not a clean full
-source APK. Complete Kotlin compilation and the native compositor target
-(79 clean build steps from this C: checkout) passed separately. Runtime33c0cfe7
-and WSIb1bad07f are manifest-checked.
+Prepare runtime inputs first; `record` attests existing dependencies, it does not
+fetch/build them. On Windows use `gradlew.bat` and `-PmavkWslVerify=true`; run the
+Python attestation inside WSL with zstd available. `skipRust` preserves the tested
+Steam-focused build; optional Rust store downloaders are not included.
+The `.mavk` package suffix preserves the stock application.
 
-Actual scaled input check: output2000,1200 maps to X client1820,1108; no stuck
-buttons. Fullscreen AHB input is selected before the underlying X11 desktop.
-Policy AHB↔SHM reversal and invalid-geometry fallback passed. Captured relative
-mouse input and real game input after this change remain unverified.
+Runtime ZIP/version/manifests must change together. The packaged game policy
+must match the checked-in source, not a private device directory. Never publish
+Steam prefixes, account data, signing secrets or unsanitized device logs.
 
-Tests (Linux/WSL):81 game-environment and30 controller cases PASS. Mavk packaging:
-17PASS. Run with `python3 -m unittest discover -s tools/tests -p test_game_environment.py`
-and similarly test_droiddeckctl.py. Tests requiring fcntl/executable shebangs are
-Linux tests, not Windows-native Python tests.
+## Publication status
 
-Final complete release build and full game regression are still pending. This
-document does not label the prototype release-ready before those checks finish.
+Local source/APK preparation only: no push or publication. The new API runtime is
+`8213c6709ef42a73cbd32c1e48aadad49788800a8552fe83f802fa6472ba08cb`.
+A normal Gradle experimental APK builds successfully; clean-checkout reproduction
+and final ordinary-button device regression are still being completed.
 
-## Licensing / publication checklist
-
-DroidDeck remains GPLv3; retain its notices and provide corresponding source for
-the distributed build. Mavk's own code is Apache2 unless individually marked;
-the WSI layer is MIT. DXVK-Sarek, Mesa/Zink, libhybris, Openbox, SPIRV-Tools,
-Vulkan headers and other payload components retain their respective licenses.
-Check Mavk/THIRD_PARTY_NOTICES.md and the payload license directory.
-
-Before distributing APKs: review exact binary/source revisions, publish required
-corresponding sources/patches and notices, choose a personal signing key, and
-rerun device/game tests. Never publish private signing keys, Steam data, prefixes,
-or device logs containing account information. Runtime binaries are ignored by
-this source checkout until the source-compliance bundle is finalized.
-
-No push or public repository creation is performed by this preparation.
+DroidDeck is GPLv3. Mavk’s own code is Apache2 except marked derivatives; WSI is
+MIT and the derived Proton wrapper remains GPLv3. Sarek, Mesa/Zink, libhybris,
+Openbox, SPIRV-Tools and other components keep their own licenses. Notices are
+included, but complete corresponding-source coverage for all prebuilt runtime
+components remains a binary-distribution gate. Source review can proceed without
+pretending this is a fully certified/conformant release.
